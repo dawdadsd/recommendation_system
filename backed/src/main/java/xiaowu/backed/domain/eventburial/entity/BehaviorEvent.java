@@ -9,20 +9,19 @@ import java.util.UUID;
 
 /**
  * 用户行为事件实体
- * 代表用户在系统中的单次行为
+ * @author xiaowu
  */
 @Getter
 public class BehaviorEvent {
-    private final String eventId;           // 事件唯一标识
-    private final Long userId;              // 用户ID
-    private final Long itemId;              // 商品ID
-    private final BehaviorType behaviorType; // 行为类型
-    private final Rating rating;            // 评分（可选）
-    private final Instant timestamp;        // 事件时间戳
-    private final String sessionId;         // 会话ID
-    private final String deviceInfo;        // 设备信息
+    private final String eventId;
+    private final Long userId;
+    private final Long itemId;
+    private final BehaviorType behaviorType;
+    private final Rating rating;
+    private final Instant timestamp;
+    private final String sessionId;
+    private final String deviceInfo;
 
-    // 私有构造函数，强制使用建造者模式
     private BehaviorEvent(Builder builder) {
         this.eventId = builder.eventId;
         this.userId = builder.userId;
@@ -34,10 +33,6 @@ public class BehaviorEvent {
         this.deviceInfo = builder.deviceInfo;
     }
 
-    /**
-     * 验证事件是否有效
-     * 用于Spark流处理中的数据质量检查
-     */
     public boolean isValid() {
         return userId != null && userId > 0 &&
                 itemId != null && itemId > 0 &&
@@ -46,22 +41,15 @@ public class BehaviorEvent {
                 !timestamp.isAfter(Instant.now());
     }
 
-    /**
-     * 计算事件权重，用于推荐算法
-     * 结合行为类型权重和评分
-     */
+    /** 计算事件权重：行为类型基础权重 * 标准化评分 */
     public double calculateEventWeight() {
         double baseWeight = behaviorType.getWeight();
         if (!rating.isEmpty()) {
-            // 评分行为的权重 = 基础权重 * 标准化评分
             return baseWeight * rating.normalize();
         }
         return baseWeight;
     }
 
-    /**
-     * 检查事件是否过期（用于实时推荐的时间窗口）
-     */
     public boolean isExpired(int validHours) {
         Instant expireTime = timestamp.plusSeconds(validHours * 3600L);
         return Instant.now().isAfter(expireTime);
@@ -79,10 +67,6 @@ public class BehaviorEvent {
         return Objects.hash(eventId);
     }
 
-    /**
-     * 建造者模式用于创建行为事件
-     * 确保必要字段的完整性
-     */
     public static class Builder {
         private final String eventId;
         private Long userId;
@@ -138,10 +122,6 @@ public class BehaviorEvent {
             return this;
         }
 
-        /**
-         * 构建行为事件实例
-         * 在构建前进行最终验证
-         */
         public BehaviorEvent build() {
             Objects.requireNonNull(userId, "用户ID不能为空");
             Objects.requireNonNull(itemId, "商品ID不能为空");
