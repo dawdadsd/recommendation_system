@@ -33,12 +33,10 @@ public class UserBehaviorAggregate {
         if (!event.isValid()) {
             throw new IllegalArgumentException("无效的行为事件");
         }
-        // 检查重复事件（同一用户对同一商品在短时间内的相同行为）
         if (isDuplicateEvent(event)) {
-            return; // 忽略重复事件
+            return;
         }
         behaviorEvents.add(event);
-        // 应用领域规则：限制事件数量以避免内存问题
         if (behaviorEvents.size() > 10000) {
             removeOldestEvents();
         }
@@ -68,40 +66,29 @@ public class UserBehaviorAggregate {
         return getEventsInTimeRange(cutoffTime,Instant.now());
     }
 
-    /**
-     * 计算用户对特定商品类别的偏好度
-     * 这是推荐算法的基础特征
-     */
+    /** 计算用户对各商品类别的偏好度（归一化权重），用于推荐算法特征 */
     public Map<String, Double> calculateCategoryPreferences() {
         Map<String, Double> preferences = new HashMap<>();
-        // 按商品类别分组计算权重和
-        // 这里假设从itemId可以获取类别信息，实际实现需要商品服务
         for (BehaviorEvent event : behaviorEvents) {
-            String category = "category_" + (event.getItemId() % 10); // 模拟分类
-            double weight = event.calculateEventWeight();
-            preferences.merge(category, weight, Double::sum);
+            String category = "category_" + (event.getItemId() % 10);
+            preferences.merge(category, event.calculateEventWeight(), Double::sum);
         }
-        // 标准化偏好度
         double totalWeight = preferences.values().stream().mapToDouble(Double::doubleValue).sum();
         if (totalWeight > 0) {
             preferences.replaceAll((k, v) -> v / totalWeight);
         }
         return preferences;
     }
-    /**
-     * 检查用户是否为活跃用户
-     * 用于推荐策略的选择
-     */
+
+    /** 7天内行为数 >= 10 则视为活跃用户 */
     public boolean isActiveUser() {
         Instant sevenDaysAgo = Instant.now().minus(7, ChronoUnit.DAYS);
         long recentEventCount = behaviorEvents.stream()
                 .filter(event -> event.getTimestamp().isAfter(sevenDaysAgo))
                 .count();
-        return recentEventCount >= 10; // 7天内至少10次行为
+        return recentEventCount >= 10;
     }
-    /**
-     * 获取用户最喜欢的行为类型
-     */
+
     public BehaviorType getMostFrequentBehaviorType() {
         return behaviorEvents.stream()
                 .collect(Collectors.groupingBy(BehaviorEvent::getBehaviorType, Collectors.counting()))
