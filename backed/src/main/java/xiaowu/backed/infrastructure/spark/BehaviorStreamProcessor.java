@@ -10,9 +10,11 @@ import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
 import org.apache.spark.sql.streaming.StreamingQuery;
 import org.apache.spark.sql.streaming.StreamingQueryException;
+import org.apache.spark.sql.streaming.Trigger;
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.StructType;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.SmartLifecycle;
 import org.springframework.stereotype.Component;
 
 import lombok.extern.slf4j.Slf4j;
@@ -25,7 +27,7 @@ import lombok.extern.slf4j.Slf4j;
  */
 @Slf4j
 @Component
-public class BehaviorStreamProcessor {
+public class BehaviorStreamProcessor implements SmartLifecycle {
 
     @Value("${spring.kafka.bootstrap-servers}")
     private String bootstrapServers;
@@ -98,6 +100,36 @@ public class BehaviorStreamProcessor {
         return state.get() == State.RUNNING;
     }
 
+    /**
+     * spring容器启动时不会自动调用start方法,需要手动调用start方法来启动Spark
+     * Streaming,以避免与StreamSimulatorService的启动顺序问题
+     *
+     * @return false 表示不自动启动,需要手动调用start方法
+     */
+    @Override
+    public boolean isAutoStartup() {
+        return false;
+    }
+
+    /**
+     * 关闭顺序 : 值越大越先关闭
+     * spark 在 kafka,database之前停止
+     * spark依赖kafka消费数据,必须先停spark,在停kafka
+     *
+     * @return Integer.MAX_VALUE - 1 确保在大多数组件之后停止,但在一些特殊组件之前停止
+     */
+    @Override
+    public int getPhase() {
+        return Integer.MAX_VALUE - 1;
+    }
+
+    @Override
+    public void stop(Runnable callback) {
+        stop();
+        callback.run();
+        ;
+    }
+
     private void runStreamingJob() {
         SparkSession spark = SparkSession.builder()
                 .appName(sparkAppName)
@@ -157,7 +189,7 @@ public class BehaviorStreamProcessor {
                     .format("console")
                     .option("truncate", "false")
                     .option("numRows", "20")
-                    .trigger(org.apache.spark.sql.streaming.Trigger.ProcessingTime("10 seconds"))
+                    .trigger(Trigger.ProcessingTime("10 seconds"))
                     .start();
 
             runningQuery.set(query);
