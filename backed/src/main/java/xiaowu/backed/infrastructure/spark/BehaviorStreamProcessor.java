@@ -54,6 +54,8 @@ public class BehaviorStreamProcessor implements SmartLifecycle {
 
     private final AtomicReference<StreamingQuery> runningQuery = new AtomicReference<>();
 
+    private volatile Thread streamingThread;
+
     private StructType buildEventSchema() {
         return new StructType()
                 .add("eventId", DataTypes.StringType, false)
@@ -73,12 +75,23 @@ public class BehaviorStreamProcessor implements SmartLifecycle {
             log.warn("Spark 当前状态  = {},忽略重复启动请求", state.get());
             return;
         }
-        Thread.ofVirtual()
-                .name("spark-streaming-thread")
-                .start(this::runStreamingJob);
+        streamingThread = new Thread(this::runStreamingJob, "spark-streaming-thread");
+        streamingThread.setDaemon(true);
+        streamingThread.start();
         log.info("spark streaming 线程已提交，等待初始化");
     }
 
+    /**
+     * @doc 为什么用 volatile 而不是 AtomicReference？
+     *      streamingThread 只有两个操作：start() 里写入、stop() 里读取。不需要
+     *      CAS 语义（不存在竞争写入的场景，CAS 已经在 state
+     *      上保证了只有一个线程进入 start()）。volatile
+     *      保证可见性就够了，更轻量、意图更清晰。
+     *      为什么设 daemon = true？
+     *      这是最后的安全网。正常流程由 SmartLifecycle.stop() 优雅关闭。但万一
+     *      Spring 关闭逻辑出了问题，daemon 线程不会阻止 JVM
+     *      退出，避免进程僵死。
+     */
     public void stop() {
         // 只有Running状态才能停止
         if (!state.compareAndSet(State.RUNNING, State.STOPPING)) {
@@ -93,6 +106,10 @@ public class BehaviorStreamProcessor implements SmartLifecycle {
             } catch (TimeoutException e) {
                 log.warn("Spark 停止query超时 : {}", e.getMessage());
             }
+        }
+        if (streamingThread != null && streamingThread.isAlive()) {
+            streamingThread.interrupt();
+            log.info("Spark streaming 线程已中断");
         }
     }
 
