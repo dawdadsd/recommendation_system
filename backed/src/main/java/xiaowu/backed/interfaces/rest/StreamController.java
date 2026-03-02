@@ -1,23 +1,30 @@
 package xiaowu.backed.interfaces.rest;
 
-import lombok.RequiredArgsConstructor;
+import java.time.Instant;
+import java.util.Map;
+import java.util.UUID;
+
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import lombok.RequiredArgsConstructor;
 import xiaowu.backed.application.dto.BehaviorEventDTO;
 import xiaowu.backed.application.service.StreamSimulatorService;
 import xiaowu.backed.infrastructure.kafka.BehaviorEventProducer;
 import xiaowu.backed.infrastructure.spark.BehaviorStreamProcessor;
 
-import java.time.Instant;
-import java.util.Map;
-import java.util.UUID;
-
 /**
  * 流式 Demo REST 控制器
- * POST /api/stream/start   启动模拟器 + Spark Streaming
- * POST /api/stream/stop    停止所有流处理
- * GET  /api/stream/status  查看运行状态
- * POST /api/stream/event   手动发送单条事件（调试）
+ * POST /api/stream/start 启动模拟器 + Spark Streaming
+ * POST /api/stream/stop 停止所有流处理
+ * GET /api/stream/status 查看运行状态
+ * POST /api/stream/event 手动发送单条事件（调试）
+ * 
  * @author xiaowu
  */
 @RestController
@@ -25,28 +32,26 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class StreamController {
 
-    private final StreamSimulatorService  simulatorService;
+    private final StreamSimulatorService simulatorService;
     private final BehaviorStreamProcessor streamProcessor;
-    private final BehaviorEventProducer   eventProducer;
+    private final BehaviorEventProducer eventProducer;
 
     @PostMapping("/start")
     public ResponseEntity<Map<String, Object>> start(
             @RequestParam(defaultValue = "5") int eventsPerSecond) {
-
+        // isRunning 和 start之间不是原子性,两个并发请求可以同时通过check启动两个SparkSession
         if (!streamProcessor.isRunning()) {
             streamProcessor.start();
         }
         simulatorService.start(eventsPerSecond);
 
         return ResponseEntity.ok(Map.of(
-                "code",    200,
+                "code", 200,
                 "message", "流式 Demo 已启动",
-                "detail",  Map.of(
+                "detail", Map.of(
                         "eventsPerSecond", eventsPerSecond,
-                        "sparkRunning",    streamProcessor.isRunning(),
-                        "simulatorRunning", simulatorService.isRunning()
-                )
-        ));
+                        "sparkRunning", streamProcessor.isRunning(),
+                        "simulatorRunning", simulatorService.isRunning())));
     }
 
     @PostMapping("/stop")
@@ -55,19 +60,17 @@ public class StreamController {
         streamProcessor.stop();
 
         return ResponseEntity.ok(Map.of(
-                "code",       200,
-                "message",    "流式 Demo 已停止",
-                "totalSent",  simulatorService.getTotalSent()
-        ));
+                "code", 200,
+                "message", "流式 Demo 已停止",
+                "totalSent", simulatorService.getTotalSent()));
     }
 
     @GetMapping("/status")
     public ResponseEntity<Map<String, Object>> status() {
         return ResponseEntity.ok(Map.of(
-                "simulatorRunning",  simulatorService.isRunning(),
-                "totalSent",         simulatorService.getTotalSent(),
-                "sparkQueryRunning", streamProcessor.isRunning()
-        ));
+                "simulatorRunning", simulatorService.isRunning(),
+                "totalSent", simulatorService.getTotalSent(),
+                "sparkQueryRunning", streamProcessor.isRunning()));
     }
 
     @PostMapping("/event")
@@ -84,9 +87,8 @@ public class StreamController {
         eventProducer.sendBehaviorEvent(event);
 
         return ResponseEntity.ok(Map.of(
-                "code",    200,
+                "code", 200,
                 "message", "事件已提交到 Kafka（异步）",
-                "event",   event
-        ));
+                "event", event));
     }
 }

@@ -42,6 +42,14 @@ public class BehaviorStreamProcessor {
     @Value("${spark.sql.streaming.checkpointLocation}")
     private String checkpointLocation;
 
+    // private final AtomicReference<StreamingQuery> runningQuery = new
+    // AtomicReference<>();
+    private enum State {
+        STOPPED, STARTING, RUNNING, STOPPING
+    }
+
+    private final AtomicReference<State> state = new AtomicReference<>(State.STOPPED);
+
     private final AtomicReference<StreamingQuery> runningQuery = new AtomicReference<>();
 
     private StructType buildEventSchema() {
@@ -58,27 +66,36 @@ public class BehaviorStreamProcessor {
 
     /** 启动 Spark Structured Streaming（虚拟线程，非阻塞） */
     public void start() {
-        Thread sparkThread = Thread.ofVirtual()
+        // CAS原子操作 : 只有从STOPPED到STARTING才允许启动,其他状态都不允许
+        if (!state.compareAndSet(State.STOPPED, State.STARTING)) {
+            log.warn("Spark 当前状态  = {},忽略重复启动请求", state.get());
+            return;
+        }
+        Thread.ofVirtual()
                 .name("spark-streaming-thread")
                 .start(this::runStreamingJob);
-        log.info("[Spark] Structured Streaming 线程已启动");
+        log.info("spark streaming 线程已提交，等待初始化");
     }
 
     public void stop() {
+        // 只有Running状态才能停止
+        if (!state.compareAndSet(State.RUNNING, State.STOPPING)) {
+            log.warn("Spark 当前状态 = {},无法执行停止", state.get());
+            return;
+        }
         StreamingQuery query = runningQuery.get();
         if (query != null && query.isActive()) {
             try {
                 query.stop();
-                log.info("[Spark] Streaming Query 已停止");
+                log.info("Spark stream query 已停止");
             } catch (TimeoutException e) {
-                log.warn("[Spark] 停止 Query 超时: {}", e.getMessage());
+                log.warn("Spark 停止query超时 : {}", e.getMessage());
             }
         }
     }
 
     public boolean isRunning() {
-        StreamingQuery query = runningQuery.get();
-        return query != null && query.isActive();
+        return state.get() == State.RUNNING;
     }
 
     private void runStreamingJob() {
