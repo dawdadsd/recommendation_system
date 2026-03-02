@@ -1,12 +1,12 @@
 package xiaowu.backed.domain.eventburial.service;
 
-import xiaowu.backed.domain.eventburial.aggregate.UserBehaviorAggregate;
-import xiaowu.backed.domain.eventburial.entity.BehaviorEvent;
-import xiaowu.backed.domain.eventburial.valueobject.BehaviorType;
-
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
+
+import xiaowu.backed.domain.eventburial.aggregate.UserBehaviorAggregate;
+import xiaowu.backed.domain.eventburial.entity.BehaviorEvent;
+import xiaowu.backed.domain.eventburial.valueobject.BehaviorType;
 
 /**
  * @author xiaowu

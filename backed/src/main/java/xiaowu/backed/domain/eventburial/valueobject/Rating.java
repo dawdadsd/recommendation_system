@@ -1,8 +1,8 @@
 package xiaowu.backed.domain.eventburial.valueobject;
 
-import lombok.Getter;
-
 import java.util.Objects;
+
+import lombok.Getter;
 
 /**
  * 评分值对象
@@ -26,8 +26,8 @@ public final class Rating {
     public static Rating of(double value) {
         if (value < MIN_RATING || value > MAX_RATING) {
             throw new IllegalArgumentException(
-                String.format("评分必须在%.1f到%.1f之间，当前值: %.1f",
-                    MIN_RATING, MAX_RATING, value));
+                    String.format("评分必须在%.1f到%.1f之间，当前值: %.1f",
+                            MIN_RATING, MAX_RATING, value));
         }
 
         if (Double.isNaN(value) || Double.isInfinite(value)) {
@@ -44,21 +44,29 @@ public final class Rating {
         return new Rating(0.0);
     }
 
-    public double getValue() { return value; }
-    public boolean isEmpty() { return value == 0.0; }
+    public double getValue() {
+        return value;
+    }
+
+    public boolean isEmpty() {
+        return value == 0.0;
+    }
 
     /**
      * 将评分标准化到0-1区间，用于机器学习算法
      */
     public double normalize() {
-        if (isEmpty()) return 0.0;
+        if (isEmpty())
+            return 0.0;
         return (value - MIN_RATING) / (MAX_RATING - MIN_RATING);
     }
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+        if (this == o)
+            return true;
+        if (o == null || getClass() != o.getClass())
+            return false;
         Rating rating = (Rating) o;
         return Double.compare(rating.value, value) == 0;
     }

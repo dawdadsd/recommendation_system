@@ -1,15 +1,17 @@
 package xiaowu.backed.application.dto;
 
+import java.time.Instant;
+
 import com.fasterxml.jackson.annotation.JsonFormat;
+
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.Instant;
-
 /**
  * 用户行为事件 DTO，用于 Kafka 消息 JSON 序列化/反序列化
+ * 
  * @author xiaowu
  */
 @Data
