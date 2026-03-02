@@ -161,6 +161,7 @@ public class BehaviorStreamProcessor {
                     .start();
 
             runningQuery.set(query);
+            state.set(State.RUNNING);
             log.info("[Spark] Streaming Query 已启动，等待数据...");
 
             query.awaitTermination();
@@ -168,6 +169,8 @@ public class BehaviorStreamProcessor {
         } catch (StreamingQueryException | TimeoutException e) {
             log.error("[Spark] Streaming 处理异常: {}", e.getMessage(), e);
         } finally {
+            runningQuery.set(null);
+            state.set(State.STOPPED);
             spark.stop();
             log.info("[Spark] SparkSession 已关闭");
         }
