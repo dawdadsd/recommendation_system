@@ -27,7 +27,7 @@
         <url/>
     </scm>
     <properties>
-        <java.version>25</java.version>
+        <java.version>17</java.version>
         <spark.version>4.0.0</spark.version>
         <scala.version>2.13</scala.version>
         <kafka.version>3.7.0</kafka.version>
@@ -43,6 +43,11 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+          <groupId>jakarta.servlet</groupId>
+          <artifactId>jakarta.servlet-api</artifactId>
+          <version>5.0.0</version>
         </dependency>
 
         <dependency>
@@ -143,9 +148,8 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <configuration>
-                    <source>25</source>
-                    <target>25</target>
-                    <!-- 显式声明 Lombok 注解处理器路径，确保 Java 25 下正常工作 -->
+                    <release>${java.version}</release>
+                    <!-- 显式声明 Lombok 注解处理器路径，确保 Java 17 下正常工作 -->
                     <annotationProcessorPaths>
                         <path>
                             <groupId>org.projectlombok</groupId>

@@ -156,7 +156,7 @@ public class BehaviorStreamProcessor implements SmartLifecycle {
                 .config("spark.sql.adaptive.enabled", "false")
                 .getOrCreate();
 
-        spark.sparkContext().setLogLevel("WARN");
+        // spark.sparkContext().setLogLevel("WARN"); // Spark 4.0 + Spring Boot Logback 冲突，由 Spring 统一管理日志级别
         log.info("[Spark] SparkSession 创建完成，master={}", sparkMaster);
 
         try {
