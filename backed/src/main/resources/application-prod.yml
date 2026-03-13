@@ -1,0 +1,20 @@
+spring:
+  kafka:
+    producer:
+      acks: all #等所有ISR副本确认,不丢数据
+      retries: 3 #
+      properties:
+        enbaled.idempotence: true #幂等生产者,防止重试导致重复
+        max.in.flight.requests.per.connection: 5 #幂等生产者,防止重试导致重复
+    consumer:
+      auto-offset-reset: earliest #新消费组从头消费,不漏数据
+      enable-auto-commit: false #关闭自动提交,改为手动提交,防止数据丢失
+      properties:
+        max.poll.records: 500 #每次拉取上限,控制处理时间
+        session.timeout.ms: 30000 #心跳超时
+    bootstrap-servers:
+      - localhost:9092 #Broker 就算 Kafka服务器进程,企业环境是多个Broker组成集群,客户端只需要要知道几个
+    properties:
+      enable.idempotence: true
+      max.in.flight.requests.per.connection: 5
+      compression.type: lz4

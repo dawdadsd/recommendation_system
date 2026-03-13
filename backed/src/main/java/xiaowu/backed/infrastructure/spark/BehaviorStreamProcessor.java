@@ -5,9 +5,12 @@ import static org.apache.spark.sql.functions.*;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.apache.spark.sql.Column;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
+import org.apache.spark.sql.expressions.Window;
+import org.apache.spark.sql.expressions.WindowSpec;
 import org.apache.spark.sql.streaming.StreamingQuery;
 import org.apache.spark.sql.streaming.StreamingQueryException;
 import org.apache.spark.sql.streaming.Trigger;
@@ -43,6 +46,11 @@ public class BehaviorStreamProcessor implements SmartLifecycle {
 
     @Value("${spark.sql.streaming.checkpointLocation}")
     private String checkpointLocation;
+    @Value("${kafka.topic.recommendations}")
+    private String recommendationsTopic;
+
+    @Value("${recommendation.top-n:${recommendation.default.count:10}}")
+    private int recommendationTopN;
 
     // private final AtomicReference<StreamingQuery> runningQuery = new
     // AtomicReference<>();
@@ -156,7 +164,8 @@ public class BehaviorStreamProcessor implements SmartLifecycle {
                 .config("spark.sql.adaptive.enabled", "false")
                 .getOrCreate();
 
-        // spark.sparkContext().setLogLevel("WARN"); // Spark 4.0 + Spring Boot Logback 冲突，由 Spring 统一管理日志级别
+        // spark.sparkContext().setLogLevel("WARN"); // Spark 4.0 + Spring Boot Logback
+        // 冲突，由 Spring 统一管理日志级别
         log.info("[Spark] SparkSession 创建完成，master={}", sparkMaster);
 
         try {
@@ -201,12 +210,13 @@ public class BehaviorStreamProcessor implements SmartLifecycle {
                             col("eventCount"),
                             round(col("avgRating"), 2).as("avgRating"));
 
-            StreamingQuery query = aggregated.writeStream()
+            Dataset<Row> recommendationScoreStream = buildRecommendationScoreStream(parsed);
+
+            StreamingQuery query = recommendationScoreStream.writeStream()
                     .outputMode("update")
-                    .format("console")
-                    .option("truncate", "false")
-                    .option("numRows", "20")
                     .trigger(Trigger.ProcessingTime("10 seconds"))
+                    .option("checkpointLocation", checkpointLocation + "/recommendations")
+                    .foreachBatch((batchDataset, batchId) -> publishRecommendationBatch(batchDataset, batchId))
                     .start();
 
             runningQuery.set(query);
@@ -224,4 +234,85 @@ public class BehaviorStreamProcessor implements SmartLifecycle {
             log.info("[Spark] SparkSession 已关闭");
         }
     }
+
+    private Column buildPreferenceScoreColumn() {
+        Column normalizedRatingScore = greatest(
+                lit(0.0),
+                least(
+                        lit(4.0),
+                        coalesce(col("rating"), lit(1.0)).minus(lit(1.0))));
+
+        return when(col("behaviorType").equalTo("VIEW"), lit(1.0))
+                .when(col("behaviorType").equalTo("CLICK"), lit(1.0))
+                .when(col("behaviorType").equalTo("ADD_TO_CART"), lit(3.0))
+                .when(col("behaviorType").equalTo("PURCHASE"), lit(5.0))
+                .when(col("behaviorType").equalTo("RATE"), normalizedRatingScore)
+                .otherwise(lit(0.0));
+    }
+
+    private Dataset<Row> buildRecommendationScoreStream(Dataset<Row> parsed) {
+        return parsed
+                .withWatermark("eventTime", "1 minute")
+                .withColumn("preferenceScore", buildPreferenceScoreColumn())
+                .groupBy(
+                        window(col("eventTime"), "30 seconds"),
+                        col("userId"),
+                        col("itemId"))
+                .agg(round(sum("preferenceScore"), 2).as("score"))
+                .filter(col("score").gt(lit(0.0)))
+                .select(
+                        col("window.start").as("windowStart"),
+                        col("window.end").as("windowEnd"),
+                        col("userId"),
+                        col("itemId"),
+                        col("score"));
+    }
+
+    private void publishRecommendationBatch(Dataset<Row> batchDataset, long batchId) {
+        if (batchDataset.takeAsList(1).isEmpty()) {
+            log.debug("[Spark] batchId={} 没有推荐结果更新", batchId);
+            return;
+        }
+
+        WindowSpec latestWindowByUser = Window.partitionBy("userId");
+        WindowSpec rankingWindow = Window.partitionBy("userId", "windowStart", "windowEnd")
+                .orderBy(col("score").desc(), col("itemId").asc());
+
+        Dataset<Row> latestWindowScores = batchDataset
+                .withColumn("latestWindowEnd", max(col("windowEnd")).over(latestWindowByUser))
+                .filter(col("windowEnd").equalTo(col("latestWindowEnd")))
+                .drop("latestWindowEnd");
+
+        Dataset<Row> topNRows = latestWindowScores
+                .withColumn("rank", row_number().over(rankingWindow))
+                .filter(col("rank").leq(recommendationTopN));
+
+        Dataset<Row> kafkaRows = topNRows
+                .groupBy("userId", "windowStart", "windowEnd")
+                .agg(sort_array(
+                        collect_list(
+                                struct(
+                                        col("rank").as("rank"),
+                                        col("itemId").as("itemId"),
+                                        round(col("score"), 2).as("score"))),
+                        true).as("items"))
+                .withColumn("generatedAt", current_timestamp())
+                .select(
+                        col("userId").cast("string").as("key"),
+                        to_json(struct(
+                                col("userId").as("userId"),
+                                col("generatedAt").as("generatedAt"),
+                                col("windowStart").as("windowStart"),
+                                col("windowEnd").as("windowEnd"),
+                                col("items").as("items"))).as("value"));
+
+        kafkaRows.write()
+                .format("kafka")
+                .option("kafka.bootstrap.servers", bootstrapServers)
+                .option("topic", recommendationsTopic)
+                .save();
+
+        log.info("[Spark] batchId={} 推荐结果已写入 topic={}", batchId, recommendationsTopic);
+    }
+
 }

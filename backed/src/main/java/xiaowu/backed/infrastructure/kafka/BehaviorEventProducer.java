@@ -48,6 +48,9 @@ public class BehaviorEventProducer {
              * 将对象转换为JSON字符串
              */
             String json = objectMapper.writeValueAsString(event);
+            /**
+             * 如果没有key,Kafka会使用轮询的方式将消息分布到不同分区,这样来自同一用户的事件可能会分布在不同分区,导致消费时无法保证顺序性和局部性,因此我们使用userId作为key,确保同一用户的事件被发送到同一分区,这样消费者在处理时就能保证同一用户的事件是有序的
+             */
             String key = String.valueOf(event.getUserId());
             /**
              * 异步发送Kafka消息并记录发送结果
