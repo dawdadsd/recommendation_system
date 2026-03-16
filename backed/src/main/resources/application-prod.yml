@@ -4,7 +4,7 @@ spring:
       acks: all #等所有ISR副本确认,不丢数据
       retries: 3 #
       properties:
-        enbaled.idempotence: true #幂等生产者,防止重试导致重复
+        enable.idempotence: true #幂等生产者,防止重试导致重复
         max.in.flight.requests.per.connection: 5 #幂等生产者,防止重试导致重复
     consumer:
       auto-offset-reset: earliest #新消费组从头消费,不漏数据

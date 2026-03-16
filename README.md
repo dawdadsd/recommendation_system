@@ -1,62 +1,200 @@
-﻿# recommendation_system
+# Real-time Recommendation System
 
-一个基于 **Spring Boot + Kafka + Spark Structured Streaming** 的实时行为模拟演示项目。
+基于 **Spring Boot 3.5 + Kafka + Spark 4.0 Structured Streaming** 的实时推荐系统。
 
-该版本目前以“可观测的行为流管道”为主：
+系统从 Kafka 消费用户行为事件，通过 Spark 双流水线并行处理：一条聚合用户行为写入 MySQL 用于报表分析，另一条计算物品偏好评分生成 Top-N 推荐结果写回 Kafka。
 
-- REST 接口可手动发送事件
-- 内置模拟器可持续生成用户行为事件
-- Spark Streaming 持续消费 Kafka 并做 30 秒窗口聚合
+---
 
-## 一、项目结构
+## 系统架构
 
-- `backed/src/main/java/xiaowu/backed/Application.java`
-  - Spring Boot 启动入口
-- `backed/src/main/java/xiaowu/backed/interfaces/rest/StreamController.java`
-  - 提供 Demo 用的操作接口：`start / stop / status / event`
-- `backed/src/main/java/xiaowu/backed/application/service/StreamSimulatorService.java`
-  - 定时生成随机行为事件（`VIEW/CLICK/ADD_TO_CART/PURCHASE/RATE`）并发送到 Kafka
-- `backed/src/main/java/xiaowu/backed/application/dto/BehaviorEventDTO.java`
-  - 事件对象定义（`userId`、`itemId`、`behaviorType`、`rating` 等）
-- `backed/src/main/java/xiaowu/backed/infrastructure/kafka/BehaviorEventProducer.java`
-  - 将事件序列化为 JSON 并异步发往 Kafka
-- `backed/src/main/java/xiaowu/backed/infrastructure/spark/BehaviorStreamProcessor.java`
-  - 从 `user-events` 订阅 Kafka 并进行结构化流式聚合
+```
+                         ┌──────────────────────────────┐
+                         │      StreamController         │
+                         │  POST /start /stop /event     │
+                         └──────────┬───────────────────┘
+                                    │
+                    ┌───────────────┼───────────────┐
+                    ▼                               ▼
+          StreamSimulatorService            手动发送单条事件
+          (模拟器：100用户×500商品)
+                    │
+                    ▼
+          BehaviorEventProducer
+          (JSON 序列化 → Kafka)
+                    │
+                    ▼
+        ┌───────────────────────┐
+        │   Kafka: user-events  │
+        └───────────┬───────────┘
+                    │
+                    ▼
+        KafkaEventDeserializer
+        (binary → 结构化 DataFrame)
+                    │
+          ┌─────────┴─────────┐
+          ▼                   ▼
+    流水线 1: 聚合         流水线 2: 推荐
+    30s窗口聚合            偏好评分计算
+    userId×behaviorType    userId×itemId
+          │                   │
+          ▼                   ▼
+    MySQL (upsert)      Kafka: recommendations
+    行为报表              Top-N 推荐结果
+```
 
-## 二、快速启动 Demo
+---
 
-### 1) 环境要求
+## 已实现的功能
 
-- JDK：建议 `21+`
-- Maven：3.9+
-- Kafka：本地可用的 `localhost:9092`
-- curl 或 PowerShell/HTTP Client 可用（用于调用 REST API）
+### 核心流处理
 
-### 2) Kafka 准备
+- **双流水线架构**：两条 Spark Streaming 查询共享同一个 Kafka 数据源，Spark 内部优化为单次读取
+- **行为聚合流水线**：30 秒滚动窗口，按 `userId × behaviorType` 聚合 `eventCount` 和 `avgRating`，通过 JDBC upsert 幂等写入 MySQL
+- **推荐评分流水线**：30 秒滚动窗口，按 `userId × itemId` 计算偏好总分，取每用户 Top-N 推荐结果写入 Kafka
 
-确认 Kafka 已启动并可访问：
+### 偏好评分模型
+
+| 行为类型     | 分值      | 含义                     |
+| :----------- | :-------- | :----------------------- |
+| VIEW / CLICK | 1.0       | 弱兴趣信号               |
+| ADD_TO_CART  | 3.0       | 中等购买意图             |
+| PURCHASE     | 5.0       | 强转化信号               |
+| RATE         | 0.0 - 4.0 | 用户主动评分，归一化处理 |
+
+### DDD 领域模型
+
+- **Entity**：`BehaviorEvent`（Builder 模式构建 + 参数校验）
+- **Value Object**：`BehaviorType`（枚举，含权重定义）、`Rating`（值对象，范围 1.0-5.0）
+- **Aggregate**：`UserBehaviorAggregate`（用户行为聚合根）
+- **Domain Service**：`BehaviorAnalysisService`（异常行为检测：1 小时 >1000 事件判定异常）
+
+### Kafka 生产者
+
+- 幂等生产者（`enable.idempotence=true`）
+- `acks=all` 确保所有 ISR 副本确认
+- LZ4 压缩，批量发送优化吞吐
+- userId 作为 partition key，保证同一用户的事件有序
+
+### 数据库持久化
+
+- `user_behavior_aggregation` 表存储窗口聚合结果
+- 唯一约束 `(user_id, behavior_type, window_start, window_end)` 保证幂等
+- `ON DUPLICATE KEY UPDATE` 处理 Spark checkpoint 重放场景
+
+### 生命周期管理
+
+- `SmartLifecycle` 集成，精确控制 Spark 启停顺序（先于 Kafka/DB 关闭）
+- CAS 状态机（STOPPED → STARTING → RUNNING → STOPPING）防止并发启停
+- Daemon 线程兜底，防止 JVM 僵死
+
+### REST API
+
+| 方法 | 路径                                    | 说明                         |
+| :--- | :-------------------------------------- | :--------------------------- |
+| POST | `/api/stream/start?eventsPerSecond=<n>` | 启动模拟器 + Spark Streaming |
+| POST | `/api/stream/stop`                      | 停止所有处理                 |
+| GET  | `/api/stream/status`                    | 查询运行状态                 |
+| POST | `/api/stream/event`                     | 手动发送单条事件（调试用）   |
+
+### 压力测试
+
+- `KafkaConcurrentLoadTest`：200 线程并发发送 10 万条事件，验证生产者吞吐量和可靠性
+
+---
+
+## 项目结构
+
+```
+backed/src/main/java/xiaowu/backed/
+├── Application.java                              # Spring Boot 入口
+├── interfaces/rest/
+│   └── StreamController.java                     # REST API 控制器
+├── application/
+│   ├── dto/
+│   │   ├── BehaviorEventDTO.java                 # 行为事件 DTO
+│   │   ├── RecommendedItemDTO.java               # 推荐项 DTO (rank, itemId, score)
+│   │   └── UserRecommendationDTO.java            # 用户推荐结果 DTO
+│   └── service/
+│       └── StreamSimulatorService.java           # 事件模拟器
+├── domain/
+│   ├── UserBehavior.java
+│   └── eventburial/
+│       ├── entity/BehaviorEvent.java             # 事件实体 (Builder 模式)
+│       ├── valueobject/
+│       │   ├── BehaviorType.java                 # 行为枚举 (含权重)
+│       │   └── Rating.java                       # 评分值对象
+│       ├── aggregate/UserBehaviorAggregate.java  # 聚合根
+│       └── service/BehaviorAnalysisService.java  # 异常检测服务
+└── infrastructure/
+    ├── kafka/
+    │   ├── BehaviorEventProducer.java            # Kafka 生产者
+    │   ├── KafkaProducerConfig.java              # 生产者配置
+    │   └── KafkaTopicConfig.java                 # Topic 定义
+    └── spark/
+        ├── BehaviorStreamProcessor.java          # Spark 双流水线处理器
+        └── KafkaEventDeserializer.java           # Kafka 消息反序列化
+```
+
+---
+
+## 技术栈
+
+| 组件         | 版本  | 用途                              |
+| :----------- | :---- | :-------------------------------- |
+| Spring Boot  | 3.5.3 | 应用框架                          |
+| Apache Spark | 4.0.0 | 实时流处理 (Structured Streaming) |
+| Apache Kafka | 3.7.0 | 消息队列                          |
+| MySQL        | 8.x   | 行为聚合持久化                    |
+| Java         | 17+   | 运行时                            |
+| Scala        | 2.13  | Spark 依赖                        |
+| Lombok       | -     | 代码简化                          |
+| Jackson      | -     | JSON 序列化                       |
+
+---
+
+## 快速启动
+
+### 环境要求
+
+- JDK 17+
+- Maven 3.9+
+- Kafka（`localhost:9092`）
+- MySQL（`localhost:3306`）
+
+### 1 数据库准备
+
+```sql
+CREATE DATABASE IF NOT EXISTS recommendation;
+USE recommendation;
+
+CREATE TABLE user_behavior_aggregation (
+    id              BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id         BIGINT       NOT NULL,
+    behavior_type   VARCHAR(32)  NOT NULL,
+    window_start    DATETIME(3)  NOT NULL,
+    window_end      DATETIME(3)  NOT NULL,
+    event_count     BIGINT       NOT NULL,
+    avg_rating      DOUBLE,
+    created_at      DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    UNIQUE KEY uk_user_behavior_window (user_id, behavior_type, window_start, window_end),
+    INDEX idx_user_window (user_id, window_start)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+```
+
+### 2 Kafka 准备
 
 ```bash
-# Linux / macOS
+# 确认 Kafka 可用
 kafka-topics.sh --bootstrap-server localhost:9092 --list
 
-# Windows
-kafka-topics.bat --bootstrap-server localhost:9092 --list
-```
-
-创建主题（如未开启 auto-create）
-
-```bash
+# Topic 会由应用自动创建（spring.kafka.admin.auto-create=true）
+# 如需手动创建：
 kafka-topics.sh --create --topic user-events --bootstrap-server localhost:9092 --partitions 1 --replication-factor 1
-```
-
-可选：若需观察窗口结果，建议再建一个空主题（代码当前未消费）：
-
-```bash
 kafka-topics.sh --create --topic recommendations --bootstrap-server localhost:9092 --partitions 1 --replication-factor 1
 ```
 
-### 3) 启动 Spring Boot
+### 3 启动应用
 
 ```bash
 cd backed
@@ -64,102 +202,98 @@ mvn clean package -DskipTests
 mvn spring-boot:run
 ```
 
-应用启动后默认监听 `http://localhost:8080`。
+应用监听 `http://localhost:8922`。
 
-### 4) 启动 Spark 流处理与模拟器（核心 Demo）
+### 4 启动流处理 + 模拟器
 
 ```bash
-# 每秒 5 条事件
-default_rate=5
-curl -X POST "http://localhost:8080/api/stream/start?eventsPerSecond=5"
+# 启动，每秒生成 5 条事件
+curl -X POST "http://localhost:8922/api/stream/start?eventsPerSecond=5"
 ```
 
-如果你在 Windows PowerShell 中操作：
+PowerShell:
 
 ```powershell
-Invoke-RestMethod -Method Post -Uri 'http://localhost:8080/api/stream/start?eventsPerSecond=5'
+Invoke-RestMethod -Method Post -Uri 'http://localhost:8922/api/stream/start?eventsPerSecond=5'
 ```
 
-该接口会做两件事：
-
-1. 启动 Spark Streaming 查询
-2. 启动随机事件模拟器
-
-### 5) 查看运行状态
+### 5 查看状态
 
 ```bash
-curl -X GET "http://localhost:8080/api/stream/status"
+curl http://localhost:8922/api/stream/status
 ```
 
-### 6) 手动发送一条事件
+### 6 手动发送事件
 
 ```bash
-curl -X POST "http://localhost:8080/api/stream/event" \
+curl -X POST "http://localhost:8922/api/stream/event" \
   -H "Content-Type: application/json" \
-  -d '{"eventId":"evt-1001","userId":1,"itemId":101,"behaviorType":"CLICK","sessionId":"sess-debug","deviceInfo":"Web-Chrome","timestamp":"2026-03-02T10:00:00Z"}'
+  -d '{
+    "eventId": "evt-1001",
+    "userId": 1,
+    "itemId": 101,
+    "behaviorType": "CLICK",
+    "sessionId": "sess-debug",
+    "deviceInfo": "Web-Chrome",
+    "timestamp": "2026-03-16T10:00:00Z"
+  }'
 ```
 
-`RATE` 行为可带评分：
+### 7 停止
 
 ```bash
-curl -X POST "http://localhost:8080/api/stream/event" \
-  -H "Content-Type: application/json" \
-  -d '{"eventId":"evt-1002","userId":2,"itemId":88,"behaviorType":"RATE","rating":4.5,"sessionId":"sess-debug","deviceInfo":"iOS-iPhone15","timestamp":"2026-03-02T10:00:01Z"}'
+curl -X POST "http://localhost:8922/api/stream/stop"
 ```
 
-### 7) 停止模拟
+---
+
+## 观测结果
+
+启动后观察控制台日志：
+
+1. **Kafka 生产日志**：`[Kafka] 发送成功 userId=... partition=... offset=...`
+2. **聚合写入日志**：`[Spark] batchId=... aggregation upserted to MySQL`
+3. **推荐输出日志**：`[Spark] batchId=... recommendations written to topic=recommendations`
+
+查询 MySQL 验证聚合结果：
+
+```sql
+SELECT user_id, behavior_type, event_count, avg_rating, window_start, window_end
+FROM user_behavior_aggregation
+ORDER BY window_start DESC
+LIMIT 20;
+```
+
+消费 Kafka 验证推荐结果：
 
 ```bash
-curl -X POST "http://localhost:8080/api/stream/stop"
+kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic recommendations --from-beginning
 ```
 
-## 三、Demo 结果怎么判断
+---
 
-启动后可在控制台看到两类关键日志：
+## 配置说明
 
-1. 生产日志（Kafka Producer）
-   - 成功发送：`[Kafka] 发送成功 userId=... partition=... offset=...`
-   - 失败发送：`[Kafka] 发送失败 ...`
+配置文件：`backed/src/main/resources/application.yml`
 
-2. Spark 聚合输出（`console`）
-   - 每 10 秒输出一次最近 30 秒窗口的聚合：
-     - `windowStart`, `windowEnd`
-     - `userId`, `behaviorType`
-     - `eventCount`, `avgRating`
+| 配置项                                   | 默认值                                     | 说明            |
+| :--------------------------------------- | :----------------------------------------- | :-------------- |
+| `server.port`                            | 8922                                       | 服务端口        |
+| `spring.kafka.bootstrap-servers`         | localhost:9092                             | Kafka 地址      |
+| `spring.datasource.url`                  | jdbc:mysql://localhost:3306/recommendation | MySQL 地址      |
+| `spark.master`                           | local[*]                                   | Spark 运行模式  |
+| `spark.sql.streaming.checkpointLocation` | ./spark-checkpoint                         | Checkpoint 目录 |
+| `recommendation.top-n`                   | 10                                         | 每用户推荐数量  |
+| `kafka.topic.user-events`                | user-events                                | 行为事件 Topic  |
+| `kafka.topic.recommendations`            | recommendations                            | 推荐结果 Topic  |
 
-## 四、接口清单
+生产环境覆盖：`application-prod.yml`
 
-- `POST /api/stream/start?eventsPerSecond=<n>`
-  - 启动（或重置）模拟器流。
-- `POST /api/stream/stop`
-  - 停止模拟器与 Spark 查询。
-- `GET /api/stream/status`
-  - 查询服务端当前状态。
-- `POST /api/stream/event`
-  - 手动投递单条行为事件。
+---
 
-## 五、配置文件
+## 常见问题
 
-默认配置位于：`backed/src/main/resources/application.properties`
-
-关键字段：
-
-- `spring.kafka.bootstrap-servers`
-  - Kafka 地址
-- `kafka.topic.user-events`
-  - 行为事件主题（默认 `user-events`）
-- `spark.master`
-  - 默认 `local[*]`
-- `spark.sql.streaming.checkpointLocation`
-  - 默认 `./spark-checkpoint`
-
-## 六、常见问题排查
-
-1. 启动时报 `Kafka` 连接失败
-   - 确认 `localhost:9092` 可达
-   - 用 `kafka-topics.bat --bootstrap-server localhost:9092 --list` 验证
-2. 启动成功但无 Spark 日志
-   - 先确认 `start` 已调用并返回 `sparkRunning=true`
-   - 检查应用日志是否有 `Streaming Query` 关键词
-3. 发送事件无响应但不报错
-   - 检查 JSON 字段是否符合模型（`userId`/`itemId` 为数字、`behaviorType` 为指定枚举之一）
+1. **Kafka 连接失败** -- 确认 `localhost:9092` 可达，用 `kafka-topics.sh --list` 验证
+2. **启动后无 Spark 日志** -- 确认已调用 `POST /api/stream/start`，检查日志中是否有 `Streaming Query` 关键词
+3. **MySQL 写入失败** -- 确认数据库 `recommendation` 已创建，表 `user_behavior_aggregation` 已建好
+4. **foreachBatch 编译歧义** -- Spark 4.0 的 Java lambda 需要显式强转 `(VoidFunction2<Dataset<Row>, Long>)`

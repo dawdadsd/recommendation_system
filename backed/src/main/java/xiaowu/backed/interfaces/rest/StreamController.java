@@ -24,7 +24,7 @@ import xiaowu.backed.infrastructure.spark.BehaviorStreamProcessor;
  * POST /api/stream/stop 停止所有流处理
  * GET /api/stream/status 查看运行状态
  * POST /api/stream/event 手动发送单条事件（调试）
- * 
+ *
  * @author xiaowu
  */
 @RestController
