@@ -12,48 +12,61 @@ spring:
     password: root
     driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
-      maximum-pool-size: 10          # 连接池上限
-      minimum-idle: 5                # 最小空闲连接
-      connection-timeout: 30000      # 获取连接超时 30s
-      idle-timeout: 600000           # 空闲连接回收 10min
+      maximum-pool-size: 10 # 连接池上限
+      minimum-idle: 5 # 最小空闲连接
+      connection-timeout: 30000 # 获取连接超时 30s
+      idle-timeout: 600000 # 空闲连接回收 10min
 
   jpa:
     hibernate:
-      ddl-auto: update               # 开发环境自动建表, 生产改为 none
+      ddl-auto: update # 开发环境自动建表, 生产改为 none
     show-sql: false
-    open-in-view: false              # 关闭 OSIV, 避免 Controller 层懒加载
+    open-in-view: false # 关闭 OSIV, 避免 Controller 层懒加载
 
   # ========================= Kafka =========================
   kafka:
     bootstrap-servers:
       - localhost:9092
     admin:
-      auto-create: true              # 开发环境自动创建 Topic
+      auto-create: true # 开发环境自动创建 Topic
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.apache.kafka.common.serialization.StringSerializer
-      acks: all                      # 等所有 ISR 副本确认, 不丢数据
+      acks: all # 等所有 ISR 副本确认, 不丢数据
       retries: 3
       properties:
-        enable.idempotence: true     # 幂等生产者, 防止重试导致重复
+        enable.idempotence: true # 幂等生产者, 防止重试导致重复
         max.in.flight.requests.per.connection: 5
     consumer:
       group-id: recommendation-consumer-group
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      auto-offset-reset: earliest    # 新消费组从头消费, 不漏数据
-      enable-auto-commit: false      # 关闭自动提交, 改为手动提交
+      auto-offset-reset: earliest # 新消费组从头消费, 不漏数据
+      enable-auto-commit: false # 关闭自动提交, 改为手动提交
       properties:
-        max.poll.records: 500        # 每次拉取上限, 控制处理时间
-        session.timeout.ms: 30000    # 心跳超时
+        max.poll.records: 500 # 每次拉取上限, 控制处理时间
+        session.timeout.ms: 30000 # 心跳超时
     properties:
-      compression.type: lz4          # 全局压缩, 减少网络带宽
+      compression.type: lz4 # 全局压缩, 减少网络带宽
 
   # ========================= Jackson =========================
   jackson:
     serialization:
-      write-dates-as-timestamps: false  # Instant 序列化为 ISO-8601 字符串
+      write-dates-as-timestamps: false # Instant 序列化为 ISO-8601 字符串
     time-zone: UTC
+
+  # ========================= Spring AI =========================
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY: 你的OpenAI API Key}
+      base-url: ${OPENAI_BASE_URL:你的OpenAI API 地址}
+      chat:
+        options:
+          model: ${OPENAI_MODEL:gpt-5}
+          temperature: 0.7 # 适度创造性，推荐场景不需要太发散
+          max-tokens: 1024
+      retry:
+        max-attempts: 3
 
 # ========================= Kafka Topics =========================
 kafka:

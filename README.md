@@ -1,8 +1,8 @@
 # Real-time Recommendation System
 
-基于 **Spring Boot 3.5 + Kafka + Spark 4.0 Structured Streaming** 的实时推荐系统。
+基于 **Spring Boot 3.5 + Kafka + Spark 4.0 + Spring AI** 的实时推荐系统。
 
-系统从 Kafka 消费用户行为事件，通过 Spark 双流水线并行处理：一条聚合用户行为写入 MySQL 用于报表分析，另一条计算物品偏好评分生成 Top-N 推荐结果写回 Kafka。
+系统从 Kafka 消费用户行为事件，通过 Spark 双流水线并行处理：一条聚合用户行为写入 MySQL 用于报表分析，另一条计算物品偏好评分生成 Top-N 推荐结果写回 Kafka。同时集成 Spring AI，基于用户画像（静态属性 + 动态行为）生成个性化 System Prompt，实现 AI 对话推荐。
 
 ---
 
@@ -41,6 +41,20 @@
           ▼                   ▼
     MySQL (upsert)      Kafka: recommendations
     行为报表              Top-N 推荐结果
+          │
+          ▼
+    ┌─────────────────────────────────────┐
+    │         AI 画像对话链路              │
+    │                                     │
+    │  ChatController                     │
+    │    └→ ChatService                   │
+    │         └→ UserProfileService       │
+    │              ├→ user_profile (静态) │
+    │              └→ behavior_agg (动态) │
+    │              └→ 拼装 System Prompt  │
+    │         └→ Spring AI ChatClient     │
+    │              └→ GPT-4o-mini 回复    │
+    └─────────────────────────────────────┘
 ```
 
 ---
@@ -79,8 +93,19 @@
 ### 数据库持久化
 
 - `user_behavior_aggregation` 表存储窗口聚合结果
+- `user_profile` 表存储用户静态画像（性别、年龄段、地域、偏好标签）
+- `item_catalog` 表存储商品信息（名称、品类、价格、标签）
 - 唯一约束 `(user_id, behavior_type, window_start, window_end)` 保证幂等
 - `ON DUPLICATE KEY UPDATE` 处理 Spark checkpoint 重放场景
+- 预置 20 个用户画像 + 100 条商品数据用于演示
+
+### AI 画像对话
+
+- **Spring AI 集成**：通过 `ChatClient` 抽象对接 OpenAI API，支持一行配置切换模型
+- **用户画像拼装**：`UserProfileService` 合并静态属性（user_profile）和动态行为（behavior_aggregation），生成结构化 System Prompt
+- **行为模式推断**：基于近 7 天行为分布自动判定用户类型（比价型 / 目标明确型 / 探索型）
+- **个性化对话**：AI 根据画像调整推荐策略和对话风格
+- **全链路日志**：每个步骤（画像查询 → Prompt 拼装 → AI 调用 → 响应）均有 INFO 级别日志输出
 
 ### 生命周期管理
 
@@ -96,6 +121,7 @@
 | POST | `/api/stream/stop`                      | 停止所有处理                 |
 | GET  | `/api/stream/status`                    | 查询运行状态                 |
 | POST | `/api/stream/event`                     | 手动发送单条事件（调试用）   |
+| POST | `/api/chat?userId=<id>`                 | AI 画像对话（Body: 纯文本）  |
 
 ### 压力测试
 
@@ -109,18 +135,31 @@
 backed/src/main/java/xiaowu/backed/
 ├── Application.java                              # Spring Boot 入口
 ├── interfaces/rest/
-│   └── StreamController.java                     # REST API 控制器
+│   ├── StreamController.java                     # 流处理 REST API
+│   └── ChatController.java                       # AI 对话 REST API
 ├── application/
 │   ├── dto/
 │   │   ├── BehaviorEventDTO.java                 # 行为事件 DTO
-│   │   ├── RecommendedItemDTO.java               # 推荐项 DTO (rank, itemId, score)
+│   │   ├── RecommendedItemDTO.java               # 推荐项 DTO
 │   │   └── UserRecommendationDTO.java            # 用户推荐结果 DTO
 │   └── service/
-│       └── StreamSimulatorService.java           # 事件模拟器
+│       ├── StreamSimulatorService.java           # 事件模拟器
+│       ├── ChatService.java                      # AI 对话服务
+│       └── UserProfileService.java               # 用户画像拼装服务
 ├── domain/
 │   ├── UserBehavior.java
+│   ├── user/
+│   │   ├── entity/UserProfile.java               # 用户画像实体
+│   │   └── repository/UserProfileRepository.java
+│   ├── item/
+│   │   ├── entity/ItemCatalog.java               # 商品目录实体
+│   │   └── repository/ItemCatalogRepository.java
 │   └── eventburial/
-│       ├── entity/BehaviorEvent.java             # 事件实体 (Builder 模式)
+│       ├── entity/
+│       │   ├── BehaviorEvent.java                # 事件实体 (Builder 模式)
+│       │   └── UserBehaviorAggregation.java      # 窗口聚合实体
+│       ├── repository/
+│       │   └── UserBehaviorAggregationRepository.java
 │       ├── valueobject/
 │       │   ├── BehaviorType.java                 # 行为枚举 (含权重)
 │       │   └── Rating.java                       # 评分值对象
@@ -140,16 +179,18 @@ backed/src/main/java/xiaowu/backed/
 
 ## 技术栈
 
-| 组件         | 版本  | 用途                              |
-| :----------- | :---- | :-------------------------------- |
-| Spring Boot  | 3.5.3 | 应用框架                          |
-| Apache Spark | 4.0.0 | 实时流处理 (Structured Streaming) |
-| Apache Kafka | 3.7.0 | 消息队列                          |
-| MySQL        | 8.x   | 行为聚合持久化                    |
-| Java         | 17+   | 运行时                            |
-| Scala        | 2.13  | Spark 依赖                        |
-| Lombok       | -     | 代码简化                          |
-| Jackson      | -     | JSON 序列化                       |
+| 组件         | 版本      | 用途                              |
+| :----------- | :-------- | :-------------------------------- |
+| Spring Boot  | 3.5.3     | 应用框架                          |
+| Spring AI    | 1.0.0-M6  | AI 对话集成（OpenAI 抽象层）      |
+| Apache Spark | 4.0.0     | 实时流处理 (Structured Streaming) |
+| Apache Kafka | 3.7.0     | 消息队列                          |
+| MySQL        | 8.4       | 用户画像 + 行为聚合持久化         |
+| Spring Data JPA | -      | ORM 数据访问                      |
+| Java         | 17+       | 运行时                            |
+| Scala        | 2.13      | Spark 依赖                        |
+| Lombok       | -         | 代码简化                          |
+| Jackson      | -         | JSON 序列化                       |
 
 ---
 
@@ -159,30 +200,35 @@ backed/src/main/java/xiaowu/backed/
 
 - JDK 17+
 - Maven 3.9+
+- Docker（WSL 环境推荐）
 - Kafka（`localhost:9092`）
-- MySQL（`localhost:3306`）
 
-### 1 数据库准备
+### 1 启动 MySQL（Docker）
 
-```sql
-CREATE DATABASE IF NOT EXISTS recommendation;
-USE recommendation;
-
-CREATE TABLE user_behavior_aggregation (
-    id              BIGINT AUTO_INCREMENT PRIMARY KEY,
-    user_id         BIGINT       NOT NULL,
-    behavior_type   VARCHAR(32)  NOT NULL,
-    window_start    DATETIME(3)  NOT NULL,
-    window_end      DATETIME(3)  NOT NULL,
-    event_count     BIGINT       NOT NULL,
-    avg_rating      DOUBLE,
-    created_at      DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-    UNIQUE KEY uk_user_behavior_window (user_id, behavior_type, window_start, window_end),
-    INDEX idx_user_window (user_id, window_start)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+```bash
+docker run -d \
+  --name mysql \
+  -p 3306:3306 \
+  -e MYSQL_ROOT_PASSWORD=root \
+  -e MYSQL_DATABASE=recommendation \
+  -v mysql-data:/var/lib/mysql \
+  --restart unless-stopped \
+  mysql:8.4
 ```
 
-### 2 Kafka 准备
+### 2 初始化数据库
+
+```bash
+# 建表
+cat backed/src/main/resources/database/user_behavior_aggregation.sql | docker exec -i mysql mysql -u root -proot recommendation
+cat backed/src/main/resources/database/user_profile.sql | docker exec -i mysql mysql -u root -proot recommendation
+cat backed/src/main/resources/database/item_catalog.sql | docker exec -i mysql mysql -u root -proot recommendation
+
+# 导入测试数据（20 个用户画像 + 100 条商品）
+cat backed/src/main/resources/database/data-init.sql | docker exec -i mysql mysql -u root -proot recommendation
+```
+
+### 3 Kafka 准备
 
 ```bash
 # 确认 Kafka 可用
@@ -194,7 +240,7 @@ kafka-topics.sh --create --topic user-events --bootstrap-server localhost:9092 -
 kafka-topics.sh --create --topic recommendations --bootstrap-server localhost:9092 --partitions 1 --replication-factor 1
 ```
 
-### 3 启动应用
+### 4 启动应用
 
 ```bash
 cd backed
@@ -204,7 +250,7 @@ mvn spring-boot:run
 
 应用监听 `http://localhost:8922`。
 
-### 4 启动流处理 + 模拟器
+### 5 启动流处理 + 模拟器
 
 ```bash
 # 启动，每秒生成 5 条事件
@@ -217,13 +263,13 @@ PowerShell:
 Invoke-RestMethod -Method Post -Uri 'http://localhost:8922/api/stream/start?eventsPerSecond=5'
 ```
 
-### 5 查看状态
+### 6 查看状态
 
 ```bash
 curl http://localhost:8922/api/stream/status
 ```
 
-### 6 手动发送事件
+### 7 手动发送事件
 
 ```bash
 curl -X POST "http://localhost:8922/api/stream/event" \
@@ -239,7 +285,35 @@ curl -X POST "http://localhost:8922/api/stream/event" \
   }'
 ```
 
-### 7 停止
+### 8 AI 画像对话
+
+```bash
+# 用户 1 = "数码小王"，偏好 3C 数码
+curl -X POST "http://localhost:8922/api/chat?userId=1" \
+     -H "Content-Type: text/plain" \
+     -d "帮我推荐一款手机"
+
+# 用户 3 = "美妆控"，偏好美妆护肤
+curl -X POST "http://localhost:8922/api/chat?userId=3" \
+     -H "Content-Type: text/plain" \
+     -d "最近皮肤干燥，有什么推荐吗"
+
+# 不存在的用户（走默认画像，AI 会主动询问偏好）
+curl -X POST "http://localhost:8922/api/chat?userId=9999" \
+     -H "Content-Type: text/plain" \
+     -d "有什么好东西推荐"
+```
+
+观察控制台日志，会输出完整的画像构建过程：
+
+```
+[Portrait] 静态画像命中: nickname=数码小王, gender=MALE, ageRange=25-34, region=深圳, tags=手机,耳机,笔记本
+[Portrait] 行为模式推断: userId=1, pattern=比价型
+[Chat] Step 2 → 调用 AI，System Prompt 长度=256, User Message 长度=8
+[Chat] Step 3 → AI 响应完成, 耗时=1523ms
+```
+
+### 9 停止
 
 ```bash
 curl -X POST "http://localhost:8922/api/stream/stop"
@@ -272,20 +346,41 @@ kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic recommendati
 
 ---
 
+## 测试数据
+
+系统预置了 20 个用户画像和 100 条商品数据：
+
+| userId | 昵称     | 偏好标签              |
+| :----- | :------- | :-------------------- |
+| 1      | 数码小王 | 手机, 耳机, 笔记本   |
+| 2      | 运动达人 | 跑鞋, 运动服, 健身   |
+| 3      | 美妆控   | 护肤, 彩妆, 面膜     |
+| 4      | 居家好手 | 厨具, 收纳, 家电     |
+| 5      | 书虫     | 小说, 技术书, 文具   |
+| ...    | ...      | 共 20 个用户          |
+
+商品覆盖 3C 数码、运动户外、美妆护肤、家居生活、图书文具等品类。
+
+![数据库整体输出](docs/images/image.png-1773736032182.png)
+![数据库整体输出](docs/images/image.png-1773736053856.png)
+
+---
+
 ## 配置说明
 
 配置文件：`backed/src/main/resources/application.yml`
 
-| 配置项                                   | 默认值                                     | 说明            |
-| :--------------------------------------- | :----------------------------------------- | :-------------- |
-| `server.port`                            | 8922                                       | 服务端口        |
-| `spring.kafka.bootstrap-servers`         | localhost:9092                             | Kafka 地址      |
-| `spring.datasource.url`                  | jdbc:mysql://localhost:3306/recommendation | MySQL 地址      |
-| `spark.master`                           | local[*]                                   | Spark 运行模式  |
-| `spark.sql.streaming.checkpointLocation` | ./spark-checkpoint                         | Checkpoint 目录 |
-| `recommendation.top-n`                   | 10                                         | 每用户推荐数量  |
-| `kafka.topic.user-events`                | user-events                                | 行为事件 Topic  |
-| `kafka.topic.recommendations`            | recommendations                            | 推荐结果 Topic  |
+| 配置项                                   | 默认值                                     | 说明               |
+| :--------------------------------------- | :----------------------------------------- | :----------------- |
+| `server.port`                            | 8922                                       | 服务端口           |
+| `spring.kafka.bootstrap-servers`         | localhost:9092                             | Kafka 地址         |
+| `spring.datasource.url`                  | jdbc:mysql://localhost:3306/recommendation | MySQL 地址         |
+| `spring.ai.openai.api-key`              | 环境变量 `OPENAI_API_KEY`                  | OpenAI API 密钥    |
+| `spring.ai.openai.base-url`             | 环境变量 `OPENAI_BASE_URL`                 | API 中转站地址     |
+| `spring.ai.openai.chat.options.model`    | gpt-4o-mini                                | AI 模型            |
+| `spark.master`                           | local[*]                                   | Spark 运行模式     |
+| `spark.sql.streaming.checkpointLocation` | ./spark-checkpoint                         | Checkpoint 目录    |
+| `recommendation.top-n`                   | 10                                         | 每用户推荐数量     |
 
 生产环境覆盖：`application-prod.yml`
 
@@ -295,5 +390,7 @@ kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic recommendati
 
 1. **Kafka 连接失败** -- 确认 `localhost:9092` 可达，用 `kafka-topics.sh --list` 验证
 2. **启动后无 Spark 日志** -- 确认已调用 `POST /api/stream/start`，检查日志中是否有 `Streaming Query` 关键词
-3. **MySQL 写入失败** -- 确认数据库 `recommendation` 已创建，表 `user_behavior_aggregation` 已建好
+3. **MySQL 写入失败** -- 确认数据库 `recommendation` 已创建，执行 `data-init.sql` 导入测试数据
 4. **foreachBatch 编译歧义** -- Spark 4.0 的 Java lambda 需要显式强转 `(VoidFunction2<Dataset<Row>, Long>)`
+5. **AI 对话返回 503** -- 检查 `spring.ai.openai.api-key` 和 `base-url` 配置，确认 API 中转站可用
+6. **画像显示"新访客"** -- 确认用 `userId=1` 到 `20` 测试（测试数据的 user_id 范围），而非 `1001`

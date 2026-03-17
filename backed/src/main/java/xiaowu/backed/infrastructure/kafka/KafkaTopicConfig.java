@@ -26,8 +26,8 @@ public class KafkaTopicConfig {
         private final short defaultReplicas;
 
         public KafkaTopicConfig(
-                        @Value("${kafka.topic.default-partitions:1") int defaultPartitions,
-                        @Value("${kafka.topic.default-replicas:1") short defaultReplicas) {
+                        @Value("${kafka.topic.default-partitions:1}") int defaultPartitions,
+                        @Value("${kafka.topic.default-replicas:1}") short defaultReplicas) {
                 this.defaultPartitions = defaultPartitions;
                 this.defaultReplicas = defaultReplicas;
         }

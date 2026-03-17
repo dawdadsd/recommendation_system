@@ -59,7 +59,7 @@ import lombok.extern.slf4j.Slf4j;
 @Component
 public class BehaviorStreamProcessor implements SmartLifecycle {
 
-    @Value("${spring.kafka.bootstrap-servers}")
+    @Value("${spring.kafka.bootstrap-servers:localhost:9092}")
     private String bootstrapServers;
 
     @Value("${kafka.topic.user-events}")

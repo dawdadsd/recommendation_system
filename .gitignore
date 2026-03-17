@@ -41,6 +41,7 @@ pids
 
 # Java
 *.class
+spark-checkpoint/*
 
 # Package Files
 *.jar
