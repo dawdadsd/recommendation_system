@@ -58,7 +58,7 @@ spring:
   # ========================= Spring AI =========================
   ai:
     openai:
-      api-key: ${OPENAI_API_KEY: 你的OpenAI API Key}
+      api-key: ${OPENAI_API_KEY:你的OpenAI API Key}
       base-url: ${OPENAI_BASE_URL:你的OpenAI API 地址}
       chat:
         options:
@@ -100,3 +100,11 @@ recommendation:
     min-ratings: 5
   similarity:
     threshold: 0.5
+
+ai:
+  # api-key: 你的api key
+  # base-url: 你的api地址
+  model: ${OPENAI_MODEL:gpt-4o-mini}
+  proxy:
+    host: 127.0.0.1
+    port: 7890
