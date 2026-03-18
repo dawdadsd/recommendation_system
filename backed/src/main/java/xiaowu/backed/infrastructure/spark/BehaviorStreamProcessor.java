@@ -129,6 +129,14 @@ public class BehaviorStreamProcessor implements SmartLifecycle {
                 event_count = VALUES(event_count),
                 avg_rating  = VALUES(avg_rating)
             """;
+    private static final String PREFERENCE_DELTA_UPSERT_SQL = """
+            INSERT INTO user_item_preference_delta
+                (user_id, item_id, window_start, window_end, score_delta, interaction_delta)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE
+                score_delta = VALUES(score_delta),
+                interaction_delta = VALUES(interaction_delta)
+            """;
 
     /**
      * 为什么用构造器注入而非 @Autowired 字段注入？
@@ -234,8 +242,11 @@ public class BehaviorStreamProcessor implements SmartLifecycle {
         try {
             var parsed = readAndParseKafkaStream(spark);
 
-            startAggregationQuery(buildWindowAggregation(parsed));
-            startRecommendationQuery(buildRecommendationScoreStream(parsed));
+            var aggregationStream = buildWindowAggregation(parsed);
+            var recommendationStream = buildRecommendationScoreStream(parsed);
+            var preferenceDeltaStream = buildPreferenceDeltaStream(parsed);
+            startAggregationQuery(aggregationStream);
+            startRecommendationQuery(recommendationStream);
 
             state.set(State.RUNNING);
             log.info("[Spark] {} streaming queries started, awaiting data...",
@@ -334,6 +345,18 @@ public class BehaviorStreamProcessor implements SmartLifecycle {
         log.info("[Spark] aggregation query started → MySQL");
     }
 
+    private void startPreferenceDeltaQuery(Dataset<Row> preferenceDeltaStream) throws TimeoutException {
+        var query = preferenceDeltaStream.writeStream()
+                .outputMode("update")
+                .trigger(Trigger.ProcessingTime("10 seconds"))
+                .option("checkpointLocation", checkpointLocation + "/preference-delta")
+                .foreachBatch(
+                        (VoidFunction2<Dataset<Row>, Long>) this::publishPreferenceDeltaBatch)
+                .start();
+        activeQueries.add(query);
+        log.info("[Spark] preference delta query started -> MySQL(user_item_preference_delta)");
+    }
+
     /**
      * 为什么用 foreachPartition + JDBC 手写 upsert，而不是 Spark JDBC Sink（SaveMode.Append）？
      *
@@ -423,6 +446,27 @@ public class BehaviorStreamProcessor implements SmartLifecycle {
                 .otherwise(lit(0.0));
     }
 
+    private Dataset<Row> buildPreferenceDeltaStream(Dataset<Row> parsed) {
+        return parsed
+                .withWatermark("eventTime", "1 minute")
+                .withColumn("preferenceScore", buildPreferenceScoreColumn())
+                .groupBy(
+                        window(col("eventTime"), "30 seconds"),
+                        col("userId"),
+                        col("itemId"))
+                .agg(
+                        round(sum("preferenceScore"), 2).as("score"),
+                        count(lit(1)).as("interactionCount"))
+                .filter(col("score").gt(lit(0.0)))
+                .select(
+                        col("window.start").as("windowStart"),
+                        col("window.end").as("windowEnd"),
+                        col("userId"),
+                        col("itemId"),
+                        col("score"),
+                        col("interactionCount"));
+    }
+
     /**
      * 推荐评分流水线：userId x itemId → 偏好总分
      *
@@ -457,7 +501,7 @@ public class BehaviorStreamProcessor implements SmartLifecycle {
                 .trigger(Trigger.ProcessingTime("10 seconds"))
                 .option("checkpointLocation", checkpointLocation + "/recommendations")
                 .foreachBatch(
-                        (VoidFunction2<Dataset<Row>, Long>) this::publishRecommendationBatch)
+                        this::publishRecommendationBatch)
                 .start();
         activeQueries.add(query);
         log.info("[Spark] recommendation query started → Kafka({})", recommendationsTopic);
@@ -530,4 +574,49 @@ public class BehaviorStreamProcessor implements SmartLifecycle {
 
         log.info("[Spark] batchId={} recommendations written to topic={}", batchId, recommendationsTopic);
     }
+
+    private void publishPreferenceDeltaBatch(Dataset<Row> batchDataset, long batchId) {
+        if (batchDataset.takeAsList(1).isEmpty()) {
+            log.debug("[Spark] batchId={} no preference delta updates", batchId);
+            return;
+        }
+
+        var url = this.jdbcUrl;
+        var user = this.dbUsername;
+        var password = this.dbPassword;
+
+        batchDataset.foreachPartition(rows -> {
+            try (var conn = DriverManager.getConnection(url, user, password)) {
+                conn.setAutoCommit(false);
+
+                try (var stmt = conn.prepareStatement(PREFERENCE_DELTA_UPSERT_SQL)) {
+                    while (rows.hasNext()) {
+                        var row = rows.next();
+
+                        stmt.setLong(1, row.getAs("userId"));
+                        stmt.setLong(2, row.getAs("itemId"));
+                        stmt.setTimestamp(3, row.getAs("windowStart"));
+                        stmt.setTimestamp(4, row.getAs("windowEnd"));
+
+                        Number score = row.getAs("score");
+                        stmt.setDouble(5, score.doubleValue());
+
+                        Number interactionCount = row.getAs("interactionCount");
+                        stmt.setLong(6, interactionCount.longValue());
+
+                        stmt.addBatch();
+                    }
+
+                    stmt.executeBatch();
+                    conn.commit();
+                } catch (Exception e) {
+                    conn.rollback();
+                    throw e;
+                }
+            }
+        });
+
+        log.info("[Spark] batchId={} preference deltas upserted to MySQL", batchId);
+    }
+
 }
