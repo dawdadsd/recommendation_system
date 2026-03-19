@@ -247,6 +247,7 @@ public class BehaviorStreamProcessor implements SmartLifecycle {
             var preferenceDeltaStream = buildPreferenceDeltaStream(parsed);
             startAggregationQuery(aggregationStream);
             startRecommendationQuery(recommendationStream);
+            startPreferenceDeltaQuery(preferenceDeltaStream);
 
             state.set(State.RUNNING);
             log.info("[Spark] {} streaming queries started, awaiting data...",
@@ -501,7 +502,7 @@ public class BehaviorStreamProcessor implements SmartLifecycle {
                 .trigger(Trigger.ProcessingTime("10 seconds"))
                 .option("checkpointLocation", checkpointLocation + "/recommendations")
                 .foreachBatch(
-                        this::publishRecommendationBatch)
+                        (VoidFunction2<Dataset<Row>, Long>) this::publishRecommendationBatch)
                 .start();
         activeQueries.add(query);
         log.info("[Spark] recommendation query started → Kafka({})", recommendationsTopic);
@@ -618,5 +619,4 @@ public class BehaviorStreamProcessor implements SmartLifecycle {
 
         log.info("[Spark] batchId={} preference deltas upserted to MySQL", batchId);
     }
-
 }
