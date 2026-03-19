@@ -1,0 +1,34 @@
+server:
+  port: 8923
+
+spring:
+  application:
+    name: recommendation-trainer
+  main:
+    web-application-type: reactive
+  datasource:
+    url: jdbc:mysql://localhost:3306/recommendation?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+    username: root
+    password: root
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 4
+      minimum-idle: 1
+      connection-timeout: 30000
+
+spark:
+  app:
+    name: RecommendationTrainer
+  master: "local[*]"
+
+recommendation:
+  als:
+    model-name: user-cf-als
+    rank: 20
+    reg-param: 0.05
+    alpha: 20.0
+    max-iter: 10
+    top-k: 50
+    training-window-days: 90
+    min-interaction-count: 1
+    min-preference-score: 0.1

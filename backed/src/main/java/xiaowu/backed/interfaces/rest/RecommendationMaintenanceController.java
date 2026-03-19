@@ -29,5 +29,4 @@ public class RecommendationMaintenanceController {
   public ResponseEntity<PreferenceDeltaCleanupResultDTO> cleanupPreferenceDelta() {
     return ResponseEntity.ok(preferenceDeltaCleanUpService.cleanupExpiredDeltas());
   }
-
 }
