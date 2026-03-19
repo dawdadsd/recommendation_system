@@ -100,6 +100,17 @@ recommendation:
     min-ratings: 5
   similarity:
     threshold: 0.5
+  jobs:
+    aggregate-preferences:
+      enabled: true
+      initial-delay-ms: 60000 # 启动后1分钟开始第一次执行
+      fixed-delay-ms: 3600000 # 每小时执行一次
+    cleanup-preference-delta:
+      enabled: true
+      cron: "0 10 3 * * *"
+      retention-days: 30
+      batch-size: 5000
+    time-zone: Asia/Shanghai
 
 ai:
   # api-key: 你的api key
