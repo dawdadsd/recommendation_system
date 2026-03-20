@@ -19,6 +19,12 @@ public class JdbcRecommendationModelVersionRepository implements RecommendationM
             WHERE model_name = ?
             """;
 
+    private static final String FIND_PREVIOUS_VERSION_SQL = """
+            SELECT previous_version
+            FROM recommendation_model_version
+            WHERE model_name = ?
+            """;
+
     private static final String UPSERT_VERSION_SQL = """
             INSERT INTO recommendation_model_version
                 (model_name, current_version, previous_version, status, updated_at)
@@ -36,6 +42,16 @@ public class JdbcRecommendationModelVersionRepository implements RecommendationM
     public Optional<String> findCurrentVersion(String modelName) {
         List<String> values = jdbcTemplate.query(
                 FIND_CURRENT_VERSION_SQL,
+                (rs, rowNum) -> rs.getString(1),
+                modelName);
+
+        return values.isEmpty() ? Optional.empty() : Optional.ofNullable(values.get(0));
+    }
+
+    @Override
+    public Optional<String> findPreviousVersion(String modelName) {
+        List<String> values = jdbcTemplate.query(
+                FIND_PREVIOUS_VERSION_SQL,
                 (rs, rowNum) -> rs.getString(1),
                 modelName);
 

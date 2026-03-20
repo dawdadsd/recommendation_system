@@ -6,5 +6,7 @@ public interface RecommendationModelVersionRepository {
 
     Optional<String> findCurrentVersion(String modelName);
 
+    Optional<String> findPreviousVersion(String modelName);
+
     void switchVersion(String modelName, String newVersion, String previousVersion, String status);
 }

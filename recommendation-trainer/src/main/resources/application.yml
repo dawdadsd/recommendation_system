@@ -21,7 +21,18 @@ spark:
     name: RecommendationTrainer
   master: "local[*]"
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+
 recommendation:
+  recall-cleanup:
+    batch-size: 5000
   als:
     model-name: user-cf-als
     rank: 20

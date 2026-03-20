@@ -4,16 +4,25 @@ import static org.apache.spark.sql.functions.col;
 import static org.apache.spark.sql.functions.current_timestamp;
 import static org.apache.spark.sql.functions.lit;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
 import org.apache.spark.storage.StorageLevel;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
+import lombok.RequiredArgsConstructor;
 import xiaowu.trainer.domain.recommendation.repository.UserCfRecallWriteRepository;
 
 @Repository
+@RequiredArgsConstructor
 public class JdbcUserCfRecallWriteRepository implements UserCfRecallWriteRepository {
+
+    private final JdbcTemplate jdbcTemplate;
 
     @Value("${spring.datasource.url}")
     private String jdbcUrl;
@@ -58,5 +67,20 @@ public class JdbcUserCfRecallWriteRepository implements UserCfRecallWriteReposit
         } finally {
             flattened.unpersist();
         }
+    }
+
+    @Override
+    public int deleteByModelVersionNotIn(List<String> keepVersions, int batchSize) {
+        if (keepVersions.isEmpty()) {
+            return 0;
+        }
+
+        String placeholders = String.join(",", Collections.nCopies(keepVersions.size(), "?"));
+        String sql = "DELETE FROM user_cf_recall WHERE model_version NOT IN (" + placeholders + ") LIMIT ?";
+
+        List<Object> params = new ArrayList<>(keepVersions);
+        params.add(batchSize);
+
+        return jdbcTemplate.update(sql, params.toArray());
     }
 }

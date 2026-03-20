@@ -9,6 +9,7 @@ import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.spark.ml.recommendation.ALS;
 import org.apache.spark.sql.Dataset;
@@ -20,6 +21,8 @@ import org.springframework.stereotype.Service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import xiaowu.trainer.application.dto.AlsTrainingResultDTO;
+import xiaowu.trainer.application.dto.AlsTrainingStatusDTO;
+import xiaowu.trainer.application.exception.TrainingAlreadyRunningException;
 import xiaowu.trainer.domain.recommendation.repository.RecommendationModelVersionRepository;
 import xiaowu.trainer.domain.recommendation.repository.UserCfRecallWriteRepository;
 
@@ -72,27 +75,37 @@ public class AlsTrainingService {
 
         private final RecommendationModelVersionRepository recommendationModelVersionRepository;
         private final UserCfRecallWriteRepository userCfRecallWriteRepository;
+        private final AtomicBoolean trainingRunning = new AtomicBoolean(false);
+
+        private volatile TrainingStatus status = TrainingStatus.idle();
+
+        private final String TRAINING_SQL = """
+                        (SELECT user_id, item_id, preference_score, interaction_count
+                         FROM user_item_preference
+                         WHERE last_window_end >= DATE_SUB(NOW(), INTERVAL %d DAY)
+                           AND interaction_count >= %d
+                           AND preference_score >= %s) preference_training
+                        """.formatted(trainingWindowDays, minInteractionCount, minPreferenceScore);
 
         public AlsTrainingResultDTO trainAndPublish() {
+                if (!trainingRunning.compareAndSet(false, true)) {
+                        throw new TrainingAlreadyRunningException(
+                                        "ALS training is already running");
+                }
                 String modelVersion = buildModelVersion();
                 String previousVersion = recommendationModelVersionRepository
                                 .findCurrentVersion(modelName)
                                 .orElse(null);
 
-                SparkSession spark = createTrainingSparkSession();
+                SparkSession spark = null;
+                LocalDateTime startTime = LocalDateTime.now();
+                status = TrainingStatus.running(previousVersion, startTime, "LOADING_DATE", "Loading training data");
                 try {
-                        String trainingSql = """
-                                        (SELECT user_id, item_id, preference_score, interaction_count
-                                         FROM user_item_preference
-                                         WHERE last_window_end >= DATE_SUB(NOW(), INTERVAL %d DAY)
-                                           AND interaction_count >= %d
-                                           AND preference_score >= %s) preference_training
-                                        """.formatted(trainingWindowDays, minInteractionCount, minPreferenceScore);
-
+                        spark = createTrainingSparkSession();
                         var preferenceDf = spark.read()
                                         .format("jdbc")
                                         .option("url", jdbcUrl)
-                                        .option("dbtable", trainingSql)
+                                        .option("dbtable", TRAINING_SQL)
                                         .option("user", dbUsername)
                                         .option("password", dbPassword)
                                         .option("driver", "com.mysql.cj.jdbc.Driver")
@@ -106,7 +119,8 @@ public class AlsTrainingService {
                         if (userCount == 0) {
                                 throw new IllegalStateException("No training data available for ALS");
                         }
-
+                        status = TrainingStatus.running(modelVersion, startTime, "FITTING_MODEL",
+                                        "Fitting ALS model");
                         ALS als = new ALS()
                                         .setUserCol("userId")
                                         .setItemCol("itemId")
@@ -118,18 +132,22 @@ public class AlsTrainingService {
                                         .setImplicitPrefs(true)
                                         .setColdStartStrategy("drop")
                                         .setNonnegative(true);
-
                         var model = als.fit(preferenceDf);
                         var recommendationDf = breakLineage(spark, model.recommendForAllUsers(topK));
                         long recallRowCount = userCfRecallWriteRepository.replaceModelRecall(modelVersion,
                                         recommendationDf);
-
+                        status = TrainingStatus.running(modelVersion, startTime, "WRITING_RECALL",
+                                        "Writing recall rows");
                         recommendationModelVersionRepository.switchVersion(
                                         modelName,
                                         modelVersion,
                                         previousVersion,
                                         "ACTIVE");
-
+                        status = TrainingStatus.succeeded(
+                                        modelVersion,
+                                        startTime,
+                                        LocalDateTime.now(),
+                                        "ALS training finished successfully");
                         log.info(
                                         "[ALS-Training] finished, modelName={}, modelVersion={}, previousVersion={}, userCount={}, recallRowCount={}",
                                         modelName,
@@ -146,9 +164,26 @@ public class AlsTrainingService {
                                         userCount,
                                         recallRowCount,
                                         true);
+                } catch (Exception e) {
+                        status = TrainingStatus.failed(
+                                        modelVersion,
+                                        startTime,
+                                        LocalDateTime.now(),
+                                        e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage());
+                        throw e;
                 } finally {
-                        spark.stop();
+                        if (spark != null) {
+                                spark.stop();
+                        }
+                        trainingRunning.set(false);
                 }
+        }
+
+        public AlsTrainingStatusDTO getStatus() {
+                String activeVersion = recommendationModelVersionRepository
+                                .findCurrentVersion(modelName)
+                                .orElse(null);
+                return status.toDto(modelName, activeVersion);
         }
 
         private SparkSession createTrainingSparkSession() {
@@ -208,4 +243,78 @@ public class AlsTrainingService {
                         }
                 });
         }
+
+        private record TrainingStatus(
+                        AlsTrainingStatusDTO.State state,
+                        String trainingVersion,
+                        String step,
+                        LocalDateTime startedAt,
+                        LocalDateTime finishedAt,
+                        String message) {
+
+                private static TrainingStatus idle() {
+                        return new TrainingStatus(
+                                        AlsTrainingStatusDTO.State.IDLE,
+                                        null,
+                                        "IDLE",
+                                        null,
+                                        null,
+                                        "ALS training has not started yet");
+                }
+
+                private static TrainingStatus running(
+                                String trainingVersion,
+                                LocalDateTime startedAt,
+                                String step,
+                                String message) {
+                        return new TrainingStatus(
+                                        AlsTrainingStatusDTO.State.RUNNING,
+                                        trainingVersion,
+                                        step,
+                                        startedAt,
+                                        null,
+                                        message);
+                }
+
+                private static TrainingStatus succeeded(
+                                String trainingVersion,
+                                LocalDateTime startedAt,
+                                LocalDateTime finishedAt,
+                                String message) {
+                        return new TrainingStatus(
+                                        AlsTrainingStatusDTO.State.SUCCEEDED,
+                                        trainingVersion,
+                                        "COMPLETED",
+                                        startedAt,
+                                        finishedAt,
+                                        message);
+                }
+
+                private static TrainingStatus failed(
+                                String trainingVersion,
+                                LocalDateTime startedAt,
+                                LocalDateTime finishedAt,
+                                String message) {
+                        return new TrainingStatus(
+                                        AlsTrainingStatusDTO.State.FAILED,
+                                        trainingVersion,
+                                        "FAILED",
+                                        startedAt,
+                                        finishedAt,
+                                        message);
+                }
+
+                private AlsTrainingStatusDTO toDto(String modelName, String activeModelVersion) {
+                        return new AlsTrainingStatusDTO(
+                                        modelName,
+                                        activeModelVersion,
+                                        trainingVersion,
+                                        state,
+                                        step,
+                                        startedAt,
+                                        finishedAt,
+                                        message);
+                }
+        }
+
 }
