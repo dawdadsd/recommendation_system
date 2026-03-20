@@ -33,7 +33,7 @@ pids
 *.pid.lock
 
 # Markdown files
-*.md
+# *.md
 
 # Temporary files
 *.tmp
