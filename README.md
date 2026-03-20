@@ -1,210 +1,158 @@
 # Recommendation System
 
-基于 `Spring Boot 3.5 + Kafka + Spark 4.0 + MySQL + Spring AI` 的推荐系统原型，目前已经从“单体实时推荐 Demo”演进为：
+这是一个用于学习、演示和逐步扩展的推荐系统工程，当前包含 3 个模块：
 
-- 在线服务：负责行为采集、实时流处理、用户画像、AI 对话、ALS 结果读取
-- 训练服务：负责独立 ALS 协同过滤训练、版本切换、召回结果落库
+- `backed`：在线服务模块
+- `recommendation-trainer`：离线训练模块
+- `example`：教学示例模块
 
-## 当前完成度
+技术栈：
 
-当前项目已经完成了**推荐底座主链路**，可以认为完成度大致在 **70%~80%**，其中：
+- `Java 17`
+- `Spring Boot 3.5`
+- `Kafka`
+- `Spark 4.0`
+- `MySQL`
+- `Spring AI`
 
-- 已完成：实时行为采集与 Spark Streaming 聚合
-- 已完成：用户商品偏好增量账本 `user_item_preference_delta`
-- 已完成：增量汇总到训练矩阵 `user_item_preference`
-- 已完成：ALS 独立训练服务 `recommendation-trainer`
-- 已完成：ALS 结果表 `user_cf_recall`
-- 已完成：模型版本表 `recommendation_model_version`
-- 已完成：在线读取 ALS 召回结果并补齐商品信息
-- 已完成：基础清理任务与聚合任务
-- 已完成：AI 画像对话推荐链路
-- 未完成：多路召回融合
-- 未完成：排序/重排模型
-- 未完成：完整训练评估体系
-- 未完成：结果版本清理与回滚自动化
-
-## 本次已经落地的核心更新
-
-### 1. 推荐链路从 Demo 变成了可训练结构
-
-现在推荐链路不再只是：
-
-- Kafka 行为流
-- Spark 实时 TopN
-- AI 直接输出推荐
-
-而是已经具备了标准推荐系统的训练结构：
-
-1. 行为事件进入 Kafka
-2. Spark 将行为转成窗口偏好增量
-3. 增量落到 `user_item_preference_delta`
-4. 定时任务汇总成 `user_item_preference`
-5. ALS 训练生成 `user_cf_recall`
-6. 在线服务读取当前模型版本的召回结果
-
-### 2. ALS 训练已从在线服务中拆出
-
-这是本次最重要的架构升级。
-
-之前 ALS 训练放在在线服务里执行，会和：
-
-- Spring Web 容器
-- Spark Streaming
-- 同一个 SparkContext
-
-产生运行时冲突。
-
-现在已经拆成两个独立模块：
-
-- `backed`：在线服务
-- `recommendation-trainer`：训练服务
-
-这样做的收益：
-
-- 训练和实时流处理的 SparkContext 完全隔离
-- 训练失败不会拖垮在线服务
-- 后续独立部署、独立扩缩容更容易
-
-### 3. 在线读取 ALS 召回已经打通
-
-现在在线服务可以读取：
-
-- 当前生效模型版本
-- 当前用户的 ALS TopN 召回结果
-- 商品详情补齐
-- 过滤用户已强交互商品
-
-相关能力已经落在：
-
-- `RecallController`
-- `UserRecallService`
-- `ModelVersionReadRepository`
-
-## 模块说明
+## 模块概览
 
 ### `backed`
 
-在线服务模块，负责：
+在线服务，主要负责：
 
-- Web API
-- Kafka 事件采集
-- Spark Streaming 实时聚合
-- 偏好增量落库
-- `delta -> preference` 汇总
-- 清理任务
-- AI 画像对话
-- ALS 召回结果读取
+- Web API 暴露
+- Kafka 事件接入
+- Spark Streaming 行为流处理
+- 用户偏好聚合
+- 在线召回读取
+- AI 对话接口
+
+默认端口：
+
+- `8922`
 
 ### `recommendation-trainer`
 
-训练服务模块，负责：
+离线训练服务，主要负责：
 
-- 独立 Spark ALS 训练
-- 从 `user_item_preference` 读取训练矩阵
+- 基于 `user_item_preference` 做 ALS 训练
 - 生成 `user_cf_recall`
-- 切换 `recommendation_model_version`
+- 发布 `recommendation_model_version`
+- 清理旧版本召回数据
 
-## 当前已实现能力
+默认端口：
 
-### 在线服务
+- `8923`
 
-- `POST /api/stream/start?eventsPerSecond=<n>`
-  启动事件模拟和 Spark Streaming
+### `example`
 
-- `POST /api/stream/stop`
-  停止流处理
+教学示例模块，专门放“可运行、可观察、可扩展”的学习型代码。
 
-- `GET /api/stream/status`
-  查询运行状态
+默认端口：
 
-- `POST /api/stream/event`
-  手动发送一条行为事件
+- `8924`
 
-- `POST /api/chat?userId=<id>`
-  基于用户画像进行 AI 对话推荐
+## `example` 目前有什么 example
 
-- `POST /api/recommendation/maintenance/aggregate-preferences`
-  手动执行 `delta -> preference` 汇总
+当前 `example` 模块里有 2 个可运行示例：
 
-- `POST /api/recommendation/maintenance/cleanup-preference-delta`
-  手动执行偏好增量清理
+### 1. JVM 内存与 GC 学习示例
 
-- `GET /api/recommendation/recall/{userId}?limit=20`
-  读取当前模型版本下的 ALS 召回结果并补齐商品信息
+位置：
 
-### 训练服务
+- [JvmMemoryLearningService.java](c:\Users\admin\Desktop\recommendation_system\example\src\main\java\xiaowu\example\jvm\application\service\JvmMemoryLearningService.java)
+- [JvmMemoryLearningController.java](c:\Users\admin\Desktop\recommendation_system\example\src\main\java\xiaowu\example\jvm\interfaces\rest\JvmMemoryLearningController.java)
 
-- `POST /api/trainer/als/train`
-  手动触发 ALS 训练
+这个示例能学什么：
 
-训练完成后会：
+- JVM 内存划分
+- Heap / Non-Heap / Direct Buffer 的基本观察
+- GC Roots
+- 可达性分析
+- 标记清理的基本过程
+- 为什么纯 mark-sweep 会有碎片问题
 
-1. 读取 `user_item_preference`
-2. 训练 ALS 模型
-3. 生成新的 `model_version`
-4. 写入 `user_cf_recall`
-5. 更新 `recommendation_model_version`
+可访问接口：
 
-## 数据表说明
+- `GET /api/examples/jvm/layout`
+- `GET /api/examples/jvm/gc/mark-sweep`
+- `GET /api/examples/jvm/overview`
 
-### 已完成
+### 2. 支付幂等教学示例
 
-- `user_behavior_aggregation`
-  实时行为窗口聚合表
+位置：
 
-- `user_item_preference_delta`
-  用户商品偏好增量账本
+- [PaymentOrder.java](c:\Users\admin\Desktop\recommendation_system\example\src\main\java\xiaowu\example\payment\domain\entity\PaymentOrder.java)
+- [PaymentOrderRepository.java](c:\Users\admin\Desktop\recommendation_system\example\src\main\java\xiaowu\example\payment\domain\repository\PaymentOrderRepository.java)
+- [JdbcPaymentOrderRepository.java](c:\Users\admin\Desktop\recommendation_system\example\src\main\java\xiaowu\example\payment\infrastructure\persistence\JdbcPaymentOrderRepository.java)
+- [PaymentApplicationService.java](c:\Users\admin\Desktop\recommendation_system\example\src\main\java\xiaowu\example\payment\application\service\PaymentApplicationService.java)
+- [PaymentController.java](c:\Users\admin\Desktop\recommendation_system\example\src\main\java\xiaowu\example\payment\interfaces\rest\PaymentController.java)
 
-- `user_item_preference`
-  ALS 训练输入矩阵
+这个示例能学什么：
 
-- `user_cf_recall`
-  ALS 训练输出结果
+- 为什么支付必须有幂等键
+- 为什么状态机必须是单向流转
+- 为什么 `UNPAID -> PAYING -> SUCCESS / CLOSED` 比“只有成功/失败”更真实
+- 为什么真正的幂等护栏最终要落在数据库条件更新上
+- 如何用 `Repository + ApplicationService + Controller` 搭一个最小可运行支付链
 
-- `recommendation_job_checkpoint`
-  聚合任务处理进度
+当前已实现的能力：
 
-- `recommendation_model_version`
-  当前生效模型版本
+- 创建订单
+- 幂等创建
+- 发起支付
+- 回写支付成功
+- 关闭订单
+- 查询订单状态
 
-- `user_profile`
-  用户静态画像
+可访问接口：
 
-- `item_catalog`
-  商品目录
+- `GET /api/examples/payments/demo`
+- `POST /api/examples/payments/orders`
+- `POST /api/examples/payments/orders/{orderNo}/start`
+- `POST /api/examples/payments/orders/{orderNo}/success`
+- `POST /api/examples/payments/orders/{orderNo}/close`
+- `GET /api/examples/payments/orders/{orderNo}`
 
 ## 项目结构
 
 ```text
 recommendation_system/
-├── pom.xml                          # 父工程
-├── backed/                          # 在线服务
-├── recommendation-trainer/          # ALS训练服务
-└── docs/                            # 设计与复盘文档
+├─ pom.xml
+├─ backed/
+├─ recommendation-trainer/
+├─ example/
+└─ docs/
 ```
 
-### 在线模块重点类
+## 启动方式
 
-- `xiaowu.backed.Application`
-- `BehaviorStreamProcessor`
-- `PreferenceAggregationService`
-- `PreferenceDeltaCleanUpService`
-- `RecommendationJobScheduler`
-- `ChatController`
-- `RecallController`
-- `UserRecallService`
+### 启动在线服务
 
-### 训练模块重点类
+```bash
+mvn -pl backed -DskipTests spring-boot:run
+```
 
-- `xiaowu.trainer.TrainerApplication`
-- `AlsTrainingService`
-- `AlsTrainingController`
-- `JdbcUserCfRecallWriteRepository`
-- `JdbcRecommendationModelVersionRepository`
+### 启动离线训练服务
 
-## 如何启动
+```bash
+mvn -pl recommendation-trainer -DskipTests spring-boot:run
+```
 
-### 1. 准备 MySQL
+### 启动教学示例模块
+
+```bash
+mvn -pl example -DskipTests spring-boot:run
+```
+
+## 数据准备
+
+### `backed` 和 `recommendation-trainer`
+
+这两个模块默认依赖 MySQL。
+
+可以先启动本地 MySQL：
 
 ```bash
 docker run -d \
@@ -216,108 +164,105 @@ docker run -d \
   mysql:8.4
 ```
 
-### 2. 初始化数据库
+相关 SQL 目录：
 
-至少需要执行：
+- `backed/src/main/resources/database/`
+- `recommendation-trainer/src/main/resources/database/`
 
-- `user_profile.sql`
-- `item_catalog.sql`
-- `user_behavior_aggregation.sql`
-- `user_item_preference_delta.sql`
-- `user_item_preference.sql`
-- `user_cf_recall.sql`
-- `recommendation_job_checkpoint.sql`
-- `recommendation_model_version.sql`
-- `data-init.sql`
+### `example`
 
-### 3. 启动在线服务
+`example` 模块默认使用 H2 内存数据库，不需要手工建库。
 
-```bash
-mvn -pl backed -DskipTests spring-boot:run
+启动时会自动执行：
+
+- [schema.sql](c:\Users\admin\Desktop\recommendation_system\example\src\main\resources\schema.sql)
+- [data.sql](c:\Users\admin\Desktop\recommendation_system\example\src\main\resources\data.sql)
+
+H2 控制台地址：
+
+- `http://localhost:8924/h2-console`
+
+JDBC URL：
+
+- `jdbc:h2:mem:exampledb`
+
+## 支付示例测试顺序
+
+### 1. 查看内置测试样例
+
+```http
+GET /api/examples/payments/demo
 ```
 
-默认端口：
+### 2. 创建订单
 
-- `8922`
-
-### 4. 启动训练服务
-
-```bash
-mvn -pl recommendation-trainer -DskipTests spring-boot:run
+```http
+POST /api/examples/payments/orders
+Content-Type: application/json
 ```
 
-默认端口：
+```json
+{
+  "orderNo": "PAY_NEW_20260320_001",
+  "idempotencyKey": "IDEMP_NEW_20260320_001",
+  "userId": 1001,
+  "productCode": "VIP_MONTH",
+  "amountFen": 9900
+}
+```
 
-- `8923`
+### 3. 发起支付
 
-## 推荐链路说明
+```http
+POST /api/examples/payments/orders/PAY_NEW_20260320_001/start
+Content-Type: application/json
+```
 
-### 实时链路
+```json
+{
+  "idempotencyKey": "IDEMP_NEW_20260320_001"
+}
+```
 
-1. 行为事件进入 Kafka
-2. Spark Streaming 聚合窗口行为
-3. 行为报表写入 `user_behavior_aggregation`
-4. 偏好增量写入 `user_item_preference_delta`
+### 4. 模拟支付成功回调
 
-### 训练链路
+```http
+POST /api/examples/payments/orders/PAY_NEW_20260320_001/success
+Content-Type: application/json
+```
 
-1. 聚合任务把 `user_item_preference_delta` 压实到 `user_item_preference`
-2. 训练服务从 `user_item_preference` 读取训练样本
-3. ALS 训练输出 `user_cf_recall`
-4. 版本表切换当前生效模型
+```json
+{
+  "channelTradeNo": "WX202603200099",
+  "paidAt": "2026-03-20T16:30:00"
+}
+```
 
-### 在线召回链路
+### 5. 查询订单状态
 
-1. 查询当前生效 `model_version`
-2. 读取用户在该版本下的 `user_cf_recall`
-3. 补齐商品信息
-4. 过滤已强交互商品
-5. 返回候选商品列表
+```http
+GET /api/examples/payments/orders/PAY_NEW_20260320_001
+```
 
-## 目前支持的推荐方式
+## 支付示例内置种子数据
 
-### 已支持
+`data.sql` 已经预置 3 笔订单，方便直接测试：
 
-- 基于用户画像的 AI 对话推荐
-- 基于 ALS 的协同过滤召回
-- 基于实时行为的偏好增量沉淀
+- `PAY_DEMO_SUCCESS_001`
+- `PAY_DEMO_PAYING_001`
+- `PAY_DEMO_CLOSED_001`
 
-### 下一步支持
+它们分别用于观察：
 
-- 热门召回
-- 近期行为召回
-- 内容相似召回
-- 多路召回融合
-- 排序模型 / 重排模型
-- AI 解释层
-- 模型版本清理
-- 召回结果版本回滚
+- 已成功订单的幂等回写
+- 支付中订单的查询与补偿入口
+- 已关闭订单的非法流转拦截
 
-## 后续规划
+## 当前下一步扩展方向
 
-### 短期
+`example` 模块接下来最自然的扩展是：
 
-- 增加 ALS 训练状态接口
-- 增加训练中互斥保护
-- 增加 `user_cf_recall` 历史版本清理
-- 增加 trainer 模块健康检查
-
-### 中期
-
-- 引入热门召回与近期行为召回
-- 做多路召回融合
-- 引入排序层
-- 引入模型效果评估指标
-
-### 长期
-
-- 将在线服务与训练服务独立部署
-- 引入任务平台调度训练
-- 引入特征治理、实验平台和 A/B Test
-
-## 运行注意事项
-
-- Spark 运行时请使用 **JDK 17**
-- 在线服务和训练服务不要共用一个 SparkContext
-- AI Key 建议改为环境变量，不要直接写入配置文件
-- `user_item_preference_delta`、`user_item_preference`、`user_cf_recall` 都需要生命周期治理
+- 接入 `Kafka`，模拟支付成功消息重复投递
+- 接入 `Redisson`，演示按订单号加分布式锁
+- 增加“支付中超时扫描”的补偿任务
+- 进一步贴近真实支付系统的幂等闭环
