@@ -7,7 +7,6 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
@@ -48,7 +47,6 @@ import xiaowu.example.payment.domain.repository.PaymentOrderRepository;
  */
 @Repository
 @RequiredArgsConstructor
-@ConditionalOnBean(JdbcTemplate.class)
 public class JdbcPaymentOrderRepository implements PaymentOrderRepository {
 
   /**
@@ -120,7 +118,8 @@ public class JdbcPaymentOrderRepository implements PaymentOrderRepository {
   /**
    * 进入支付中状态的专用更新 SQL。
    *
-   * <p>这里必须把 paying_started_at 一起写入，
+   * <p>
+   * 这里必须把 paying_started_at 一起写入，
    * 否则后面“支付中超时补偿扫描”没有可靠的时间基准。
    */
   private static final String MARK_PAYING_SQL = """

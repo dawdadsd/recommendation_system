@@ -2,7 +2,6 @@ package xiaowu.example.payment.application.service;
 
 import java.time.LocalDateTime;
 
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -14,30 +13,36 @@ import xiaowu.example.payment.domain.repository.PaymentOrderRepository;
 /**
  * 支付应用服务。
  *
- * <p>这一层负责“编排业务流程”，而不是承载底层技术细节。
+ * <p>
+ * 这一层负责“编排业务流程”，而不是承载底层技术细节。
  * 你可以把它理解为：
  *
- * <p>1. 它知道支付请求应该先查什么、再判什么、最后写什么。
+ * <p>
+ * 1. 它知道支付请求应该先查什么、再判什么、最后写什么。
  *
- * <p>2. 它不直接写 SQL，那是 Repository 的职责。
+ * <p>
+ * 2. 它不直接写 SQL，那是 Repository 的职责。
  *
- * <p>3. 它也不直接承担分布式锁、Kafka 消费这些入口细节，
+ * <p>
+ * 3. 它也不直接承担分布式锁、Kafka 消费这些入口细节，
  * 那些后面会挂到这一层前面。
  *
- * <p>当前这一版先把最关键的幂等主流程收紧：
+ * <p>
+ * 当前这一版先把最关键的幂等主流程收紧：
  *
- * <p>- 创建支付单
+ * <p>
+ * - 创建支付单
  * - 发起支付
  * - 支付成功回写
  * - 关闭订单
  *
- * <p>注意：
+ * <p>
+ * 注意：
  * 这里还没有接 Redisson 和 Kafka，但已经把“相同订单号如何幂等处理”定清楚了。
  * 后面无论是 HTTP 重试、MQ 重复消息还是支付回调重放，最终都要落到这里。
  */
 @Service
 @RequiredArgsConstructor
-@ConditionalOnBean(PaymentOrderRepository.class)
 public class PaymentApplicationService {
 
     private final PaymentOrderRepository paymentOrderRepository;
@@ -45,14 +50,18 @@ public class PaymentApplicationService {
     /**
      * 创建支付订单。
      *
-     * <p>幂等策略：
+     * <p>
+     * 幂等策略：
      *
-     * <p>1. 如果订单不存在，就创建新订单。
+     * <p>
+     * 1. 如果订单不存在，就创建新订单。
      *
-     * <p>2. 如果订单已存在，但幂等键不同，直接拒绝。
+     * <p>
+     * 2. 如果订单已存在，但幂等键不同，直接拒绝。
      * 这代表客户端已经不再明确自己是否在重试同一笔请求。
      *
-     * <p>3. 如果订单已存在且幂等键相同，直接返回已有订单。
+     * <p>
+     * 3. 如果订单已存在且幂等键相同，直接返回已有订单。
      * 这就是“把重试权利交给网络，把去重责任留给服务端”的第一步。
      */
     @Transactional
@@ -83,16 +92,21 @@ public class PaymentApplicationService {
     /**
      * 发起支付。
      *
-     * <p>幂等策略：
+     * <p>
+     * 幂等策略：
      *
-     * <p>1. 只允许 UNPAID -> PAYING。
+     * <p>
+     * 1. 只允许 UNPAID -> PAYING。
      *
-     * <p>2. 如果已经是 PAYING，说明上一次请求已经发出但客户端可能超时了，
+     * <p>
+     * 2. 如果已经是 PAYING，说明上一次请求已经发出但客户端可能超时了，
      * 当前直接返回“支付中”即可，而不是重复发起新支付。
      *
-     * <p>3. 如果已经 SUCCESS，直接返回成功视图。
+     * <p>
+     * 3. 如果已经 SUCCESS，直接返回成功视图。
      *
-     * <p>4. 如果已经 CLOSED，拒绝再次发起支付。
+     * <p>
+     * 4. 如果已经 CLOSED，拒绝再次发起支付。
      */
     @Transactional
     public PaymentProcessResult startPayment(StartPaymentCommand command) {
@@ -126,15 +140,19 @@ public class PaymentApplicationService {
     /**
      * 支付成功回写。
      *
-     * <p>这个方法未来会被三类入口复用：
+     * <p>
+     * 这个方法未来会被三类入口复用：
      *
-     * <p>1. 支付渠道异步回调
+     * <p>
+     * 1. 支付渠道异步回调
      * 2. 主动查询补偿任务
      * 3. 少数同步确认成功场景
      *
-     * <p>幂等策略：
+     * <p>
+     * 幂等策略：
      *
-     * <p>- 如果已经 SUCCESS，直接视为幂等成功。
+     * <p>
+     * - 如果已经 SUCCESS，直接视为幂等成功。
      * - 如果不是 PAYING，拒绝非法流转。
      * - 真正落库时仍然要求 WHERE status = PAYING，防止并发重复推进。
      */
@@ -169,12 +187,15 @@ public class PaymentApplicationService {
     /**
      * 关闭订单。
      *
-     * <p>这个方法既可以处理“超时未支付关闭”，
+     * <p>
+     * 这个方法既可以处理“超时未支付关闭”，
      * 也可以处理“主动查询渠道后确认未支付”的关闭场景。
      *
-     * <p>幂等策略：
+     * <p>
+     * 幂等策略：
      *
-     * <p>- 如果已经 CLOSED，直接按幂等成功返回。
+     * <p>
+     * - 如果已经 CLOSED，直接按幂等成功返回。
      * - 如果已经 SUCCESS，拒绝关闭。
      * - 只允许 UNPAID 或 PAYING 进入 CLOSED。
      */
@@ -208,7 +229,8 @@ public class PaymentApplicationService {
     /**
      * 查询订单当前状态。
      *
-     * <p>这个方法后面很适合给前端“支付中轮询”接口复用。
+     * <p>
+     * 这个方法后面很适合给前端“支付中轮询”接口复用。
      */
     @Transactional(readOnly = true)
     public PaymentOrder getOrder(String orderNo) {
