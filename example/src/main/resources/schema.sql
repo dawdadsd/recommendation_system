@@ -31,3 +31,42 @@ CREATE TABLE payment_demo_product (
     amount_fen     BIGINT       NOT NULL,
     description    VARCHAR(255) NOT NULL
 );
+
+-- 秒杀库存真相表。
+-- 这里把库存拆成 available / reserved / sold 三段，
+-- 是为了把“抢到资格”和“真正卖出”明确区分开。
+CREATE TABLE seckill_stock (
+    sku_id             BIGINT       PRIMARY KEY,
+    activity_id        BIGINT       NOT NULL,
+    total_stock        INT          NOT NULL,
+    available_stock    INT          NOT NULL,
+    reserved_stock     INT          NOT NULL,
+    sold_stock         INT          NOT NULL,
+    version            BIGINT       NOT NULL,
+    updated_at         TIMESTAMP    NOT NULL
+);
+
+CREATE INDEX idx_seckill_stock_activity
+    ON seckill_stock (activity_id);
+
+-- 秒杀资格表。
+-- 这张表表达的是“用户拿到的限时占坑资格”，不是最终成交事实。
+CREATE TABLE seckill_reservation (
+    reservation_id      VARCHAR(64)  PRIMARY KEY,
+    activity_id         BIGINT       NOT NULL,
+    sku_id              BIGINT       NOT NULL,
+    user_id             BIGINT       NOT NULL,
+    reservation_token   VARCHAR(64)  NOT NULL,
+    status              VARCHAR(32)  NOT NULL,
+    payment_order_no    VARCHAR(64),
+    expire_at           TIMESTAMP    NOT NULL,
+    released_at         TIMESTAMP,
+    created_at          TIMESTAMP    NOT NULL,
+    updated_at          TIMESTAMP    NOT NULL
+);
+
+CREATE UNIQUE INDEX uk_seckill_reservation_user
+    ON seckill_reservation (activity_id, sku_id, user_id);
+
+CREATE INDEX idx_seckill_reservation_status_expire
+    ON seckill_reservation (status, expire_at);

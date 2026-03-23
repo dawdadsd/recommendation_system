@@ -64,3 +64,87 @@ INSERT INTO payment_order (
         TIMESTAMP '2026-03-20 12:00:00',
         TIMESTAMP '2026-03-20 12:10:00'
     );
+
+INSERT INTO seckill_stock (
+    sku_id,
+    activity_id,
+    total_stock,
+    available_stock,
+    reserved_stock,
+    sold_stock,
+    version,
+    updated_at
+) VALUES
+    (
+        20001,
+        30001,
+        100,
+        97,
+        2,
+        1,
+        3,
+        TIMESTAMP '2026-03-23 10:00:00'
+    ),
+    (
+        20002,
+        30001,
+        20,
+        20,
+        0,
+        0,
+        0,
+        TIMESTAMP '2026-03-23 10:00:00'
+    );
+
+INSERT INTO seckill_reservation (
+    reservation_id,
+    activity_id,
+    sku_id,
+    user_id,
+    reservation_token,
+    status,
+    payment_order_no,
+    expire_at,
+    released_at,
+    created_at,
+    updated_at
+) VALUES
+    (
+        'RSV_DEMO_ORDER_CREATED_001',
+        30001,
+        20001,
+        1001,
+        'TOKEN_DEMO_ORDER_CREATED_001',
+        'ORDER_CREATED',
+        'PAY_DEMO_PAYING_001',
+        TIMESTAMP '2026-03-23 10:05:00',
+        NULL,
+        TIMESTAMP '2026-03-23 10:00:00',
+        TIMESTAMP '2026-03-23 10:00:05'
+    ),
+    (
+        'RSV_DEMO_PAID_001',
+        30001,
+        20001,
+        1002,
+        'TOKEN_DEMO_PAID_001',
+        'PAID',
+        'PAY_DEMO_SUCCESS_001',
+        TIMESTAMP '2026-03-23 10:05:00',
+        NULL,
+        TIMESTAMP '2026-03-23 09:59:50',
+        TIMESTAMP '2026-03-23 10:00:05'
+    ),
+    (
+        'RSV_DEMO_RELEASED_001',
+        30001,
+        20001,
+        1003,
+        'TOKEN_DEMO_RELEASED_001',
+        'RELEASED',
+        NULL,
+        TIMESTAMP '2026-03-23 09:58:00',
+        TIMESTAMP '2026-03-23 10:01:00',
+        TIMESTAMP '2026-03-23 09:55:00',
+        TIMESTAMP '2026-03-23 10:01:00'
+    );
