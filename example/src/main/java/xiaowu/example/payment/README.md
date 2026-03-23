@@ -1,66 +1,305 @@
-支付请求超时，网络丢包，ACK丢失怎么避免用户重复支付？
+# payment 模块说明
 
-这是一个极其经典的分布式系统难题。在网络世界里，除了“成功”和“失败”，永远存在让人最头疼的第三种状态：**“未知（超时）”**。
+这个模块现在承担两条教学主线：
 
-无论是网络丢包、支付网关卡顿，还是响应 ACK 丢失，对于客户端来说，表现都是一样的：**请求发出去了，但没收到确切结果。** 此时如果用户刷新页面或者系统自动重试，极易造成资金损失（重复扣款）。
+1. 支付幂等与支付状态机
+2. 秒杀预占库存的本地教学骨架
 
-在工业级的支付架构中，解决这个问题的核心思想只有一个：**把重试的权利交给网络，把去重的责任留给服务端。**
+它不是生产级完整系统，而是一个方便你边读代码、边跑接口、边理解设计取舍的学习模块。
 
-以下是避免重复支付的完整防御体系，按照从前到后的顺序逐层拆解：
+---
 
-### 一、 第一道防线：唯一业务单号与防重 Token（幂等性基石）
+## 1. 当前已经实现了什么
 
-这是所有支付系统不发生重复扣款的绝对前提。
+### 1.1 支付教学链路
 
-- **核心机制：** 每次前端发起支付前，必须先向后端申请一个全局唯一的支付单号（`out_trade_no` 或支付 Token）。
-- **重试原则：** 当发生网络超时，客户端或者后端发起重试时，**必须携带完全相同的这个支付单号**。
-- **服务端处理：** 支付网关（如微信支付、支付宝）和你的后端服务，必须基于这个单号做**幂等性校验**。
-  - 如果数据库里查不到这个单号，说明是新请求，走正常支付逻辑。
-  - 如果单号已存在，且状态是“已支付”，直接拦截并返回“支付成功”（将丢失的 ACK 补发给客户端）。
-  - 如果状态是“支付中”，则拒绝重复提交，或要求等待。
+这一部分已经可以直接运行和调接口，核心目标是讲清楚：
 
-### 二、 第二道防线：双通道结果确认（异步回调 + 主动查询）
+- 为什么支付请求必须幂等
+- 为什么支付状态必须单向流转
+- 为什么支付成功和关单都要带旧状态条件更新
 
-当你的后端向微信/支付宝发起扣款请求，如果发生超时，你的后端也不知道到底扣没扣钱。这时候绝对不能直接把订单标为“失败”，也不能直接让用户重新发起新单。
+当前支付部分的核心类：
 
-1. **异步回调（被动接收）：**
+- `domain/entity/PaymentOrder.java`
+- `application/service/PaymentApplicationService.java`
+- `domain/repository/PaymentOrderRepository.java`
+- `infrastructure/persistence/JdbcPaymentOrderRepository.java`
+- `interfaces/rest/PaymentController.java`
 
-   支付渠道在扣款成功后，会按照一定频率（如 15s, 3m, 10m, 30m）向你的服务器发送异步通知。这是最主要的结果来源。
+支付状态机是：
 
-2. **主动查询补偿（主动出击）：**
+```text
+UNPAID -> PAYING -> SUCCESS / CLOSED
+```
 
-   回调通知也可能因为网络丢包没送达。因此，你需要一个**定时任务（补偿机制）**。对于所有处于“支付中”状态超过一定时间（比如 1 分钟）的订单，后端主动去调用支付渠道的“查询订单 API”。
-   - 如果查到确实支付成功了，把本地状态改为成功，并推进发货流程。
-   - 如果查到支付失败或未支付，才允许推进后续的关单或重试逻辑。
+---
 
-### 三、 第三道防线：分布式锁与严格的状态机（防并发击穿）
+### 1.2 秒杀教学骨架
 
-高并发下，极有可能出现一种极端情况：**用户的重试请求、定时任务的主动查询结果、微信的异步回调通知，这三者在同一毫秒内同时到达你的服务器。**
+这一部分目前先落了数据库真相层，还没有接 Redis 和 Kafka。
 
-如果不加控制，三根线程同时去更新订单状态、给用户加积分、扣减真实库存，就会发生重复发货。
+也就是说，现在你已经可以在代码里看清楚这些概念：
 
-1. **分布式锁控制并发：**
+- 秒杀里抢到的不是最终成交资格，而是限时预占资格
+- 库存应该拆成 `available / reserved / sold`
+- 资格状态和支付状态要分层建模
+- Redis 和 Kafka 以后接进来时，应该接在哪一层
 
-   所有修改订单支付状态的入口（无论是回调接口还是查询接口），第一步必须按订单号加分布式锁（如使用 Redisson 获取 `lock:pay:order:{orderId}`）。拿到锁的线程才能执行状态流转，没拿到的直接快速失败或等待。
+当前已经补上的秒杀代码：
 
-2. **严格的状态机单向流转：**
+- `seckill/domain/entity/SeckillReservation.java`
+- `seckill/domain/entity/SeckillStock.java`
+- `seckill/domain/repository/SeckillReservationRepository.java`
+- `seckill/domain/repository/SeckillStockRepository.java`
+- `seckill/infrastructure/persistence/JdbcSeckillReservationRepository.java`
+- `seckill/infrastructure/persistence/JdbcSeckillStockRepository.java`
 
-   订单状态只能是单向推进的：`UNPAID` (待支付) -> `PAYING` (支付中) -> `SUCCESS` (成功) / `CLOSED` (关闭)。
+当前秒杀部分的重点不是接口，而是两张表和两类状态推进：
 
-   在更新数据库时，必须带上旧状态作为乐观锁更新条件：
+- `seckill_reservation`
+- `seckill_stock`
 
-   ```sql
-   UPDATE orders
-   SET status = 'SUCCESS', pay_time = NOW()
-   WHERE order_id = 1001 AND status = 'PAYING';
-   ```
+---
 
-   如果这行 SQL 返回的更新行数（affected rows）是 0，说明这个订单已经被其他线程处理过了，当前线程直接丢弃后续操作即可。
+## 2. 为什么秒杀先只做 JDBC + H2
 
-### 四、 客户端防抖与优雅交互（防用户暴躁连点）
+这是刻意的，不是没做完就先丢着。
 
-很多重复支付其实是用户在网络卡顿时“暴躁连点”造成的。前端也需要做好配合：
+原因是：
 
-- **支付按钮防抖：** 用户点击“确认支付”后，按钮立刻置灰或 Loading，禁止二次点击。
-- **轮询查询状态：** 当发起支付接口超时，前端不要立刻弹“支付失败”，而是应该每隔 2 秒向你自己的后端发起一次订单状态查询，轮询 3-5 次。
-- **支付中锁定：** 如果用户在“支付中”状态强行返回上一页想要重新下单，系统必须拦截，提示“您的订单正在处理中，请稍后查看结果，切勿重复支付”。只有等后端主动查询确认上一次真的没扣款，并关闭了旧单后，才允许生成新支付单。
+1. 秒杀最容易讲乱的不是 Redis 命令怎么写，而是库存真相和资格状态到底该怎么落库。
+2. 如果数据库状态机都没定住，就先接 Redis 和 Kafka，最后通常会变成“消息会飞，但业务边界不清楚”。
+3. 先把 H2 + JDBC 跑通后，后面再接 Redis Lua 和 Kafka，只是在现有边界上补适配器，不用返工整个模型。
+
+所以当前阶段的目标是先把下面这件事定死：
+
+```text
+可售库存 -> 冻结库存 -> 已售库存 / 已释放库存
+```
+
+---
+
+## 3. 当前秒杀状态设计
+
+### 3.1 资格状态
+
+当前代码里的秒杀资格状态在：
+
+- `SeckillReservation.ReservationStatus`
+
+当前保留的状态有：
+
+```text
+RESERVED
+ORDER_CREATED
+PAID
+CANCELLED
+EXPIRED
+RELEASED
+```
+
+其中最关键的是：
+
+- `PAID` 之后绝不能释放库存
+- `RELEASED` 是释放终态，同一条资格只能进入一次
+
+---
+
+### 3.2 库存状态
+
+当前库存模型在：
+
+- `SeckillStock`
+
+库存恒等式是：
+
+```text
+available_stock + reserved_stock + sold_stock = total_stock
+```
+
+三种核心推进：
+
+1. 用户抢到资格
+
+```text
+available - 1
+reserved + 1
+```
+
+2. 用户支付成功
+
+```text
+reserved - 1
+sold + 1
+```
+
+3. 用户取消或超时
+
+```text
+reserved - 1
+available + 1
+```
+
+---
+
+## 4. 当前数据库表
+
+当前 H2 中已经有以下几张核心表：
+
+- `payment_order`
+- `payment_demo_user`
+- `payment_demo_product`
+- `seckill_stock`
+- `seckill_reservation`
+
+其中新增的两张秒杀表定义在：
+
+- `src/main/resources/schema.sql`
+
+演示数据在：
+
+- `src/main/resources/data.sql`
+
+你现在可以在 H2 控制台里直接查这两张表，看秒杀资格和库存真相长什么样。
+
+---
+
+## 5. 如何运行
+
+启动：
+
+```bash
+mvn -pl example -DskipTests spring-boot:run
+```
+
+默认地址：
+
+- `http://localhost:8924`
+
+H2 控制台：
+
+- `http://localhost:8924/h2-console`
+- JDBC URL: `jdbc:h2:mem:exampledb`
+- user: `sa`
+- password: 空
+
+如果 `8924` 端口被占用，可以临时换端口启动。
+
+---
+
+## 6. 支付接口还能怎么测
+
+当前可直接调的还是支付教学接口：
+
+1. 查看 demo 数据
+
+```http
+GET /api/examples/payments/demo
+```
+
+2. 创建订单
+
+```http
+POST /api/examples/payments/orders
+```
+
+3. 发起支付
+
+```http
+POST /api/examples/payments/orders/{orderNo}/start
+```
+
+4. 模拟支付成功
+
+```http
+POST /api/examples/payments/orders/{orderNo}/success
+```
+
+5. 关闭订单
+
+```http
+POST /api/examples/payments/orders/{orderNo}/close
+```
+
+6. 查询订单
+
+```http
+GET /api/examples/payments/orders/{orderNo}
+```
+
+更细的操作样例可以看：
+
+- `doc/测试教学.md`
+
+---
+
+## 7. 秒杀部分现在怎么学
+
+虽然秒杀还没开放 REST 接口，但你已经可以按下面顺序读：
+
+1. 先看设计文档
+
+- `doc/秒杀教学-Redis-Kafka方案.md`
+
+2. 再看领域对象
+
+- `seckill/domain/entity/SeckillReservation.java`
+- `seckill/domain/entity/SeckillStock.java`
+
+3. 再看仓储接口
+
+- `seckill/domain/repository/SeckillReservationRepository.java`
+- `seckill/domain/repository/SeckillStockRepository.java`
+
+4. 最后看 JDBC 实现
+
+- `seckill/infrastructure/persistence/JdbcSeckillReservationRepository.java`
+- `seckill/infrastructure/persistence/JdbcSeckillStockRepository.java`
+
+建议你重点观察两件事：
+
+- 为什么仓储更新要带 `expectedStatus` 或 `version`
+- 为什么释放库存不能只是简单 `INCR`
+
+---
+
+## 8. 当前还没做的部分
+
+这部分暂时故意不接：
+
+- Redis Lua 原子预占
+- Kafka 异步建单
+- Redis ZSet 超时释放
+- 秒杀 REST Controller
+- 秒杀 ApplicationService 的完整 Spring 装配
+
+原因不是不需要，而是当前阶段优先级更低。
+
+你现在回头接 Redis 和 Kafka 时，应该把它们分别接到这里：
+
+- Redis 对接 `ReservationCacheGateway`
+- Kafka 对接 `ReservationEventPublisher`
+
+---
+
+## 9. 下一步建议
+
+当前最合理的继续顺序是：
+
+1. 先补一个本地秒杀应用服务，把 JDBC 仓储真正串起来
+2. 再补一个简单的秒杀查询/演示接口
+3. 最后再接 Redis 和 Kafka 适配器
+
+这样做的好处是：每一步都能验证业务边界，没有哪一层是“先接了再说”。
+
+---
+
+## 10. 一句话总结
+
+这个模块当前已经把两件关键事情分开了：
+
+- `payment_order` 负责支付真相
+- `seckill_reservation + seckill_stock` 负责秒杀库存真相
+
+后面不管你接 Redis 还是 Kafka，都应该围绕这个分层继续往下长，而不是把所有状态重新揉成一团。
