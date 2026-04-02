@@ -20,6 +20,9 @@ public interface ReservationCacheGateway {
    */
   boolean release(ReleaseCacheCommand command);
 
+  /**
+   * 预订缓存命令
+   */
   record ReserveCacheCommand(
       String reservationId,
       Long activityId,

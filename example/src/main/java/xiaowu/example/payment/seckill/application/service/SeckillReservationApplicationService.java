@@ -21,6 +21,7 @@ import xiaowu.example.payment.seckill.domain.repository.SeckillReservationReposi
  * 将其保留在组件扫描之外，直到 Redis/Kafka 适配器可用
  * 已实施。
  */
+
 public class SeckillReservationApplicationService {
 
   private final SeckillReservationRepository reservationRepository;

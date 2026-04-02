@@ -16,9 +16,52 @@ spring:
   sql:
     init:
       mode: always
+      schema-locations: classpath:sql/schema.sql
+      data-locations: classpath:sql/data.sql
+  kafka:
+    bootstrap-servers:
+      - localhost:9092
+    producer:
+      acks: all
+      retries: 3
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      properties:
+        enable.idempotence: true
+        max.in.flight.requests.per.connection: 5
+        retry.backoff.ms: 100
+        compression.type: lz4
+        linger.ms: 1
+        batch.size: 32768
+        delivery.timeout.ms: 30000
+        request.timeout.ms: 10000
+    consumer:
+      group-id: example-supplier-pull-worker
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
 
 management:
   endpoints:
     web:
       exposure:
         include: health,info
+
+seckill:
+  kafka:
+    topic:
+      reservation-created: seckill.reservation.created
+      reservation-release: seckill.reservation.release
+
+supplier:
+  kafka:
+    topic:
+      pull-request: supplier.pull.request
+  scheduling:
+    enabled: true
+    fixed-delay-ms: 10000
+    batch-size: 50
+    lease-seconds: 30
+  worker:
+    enabled: true
+    retry-delay-seconds: 45

@@ -35,6 +35,19 @@ import xiaowu.example.payment.seckill.domain.repository.SeckillStockRepository;
 @RequiredArgsConstructor
 public class JdbcSeckillStockRepository implements SeckillStockRepository {
 
+  private static final String FIND_ALL_SQL = """
+      SELECT
+          sku_id,
+          activity_id,
+          total_stock,
+          available_stock,
+          reserved_stock,
+          sold_stock,
+          version,
+          updated_at
+      FROM seckill_stock
+      """;
+
   private static final String FIND_BY_SKU_ID_SQL = """
       SELECT
           sku_id,
@@ -88,6 +101,11 @@ public class JdbcSeckillStockRepository implements SeckillStockRepository {
   private final JdbcTemplate jdbcTemplate;
 
   private final RowMapper<SeckillStock> stockRowMapper = new SeckillStockRowMapper();
+
+  @Override
+  public List<SeckillStock> findAll() {
+    return jdbcTemplate.query(FIND_ALL_SQL, stockRowMapper);
+  }
 
   @Override
   public Optional<SeckillStock> findBySkuId(Long skuId) {

@@ -70,3 +70,30 @@ CREATE UNIQUE INDEX uk_seckill_reservation_user
 
 CREATE INDEX idx_seckill_reservation_status_expire
     ON seckill_reservation (status, expire_at);
+
+-- 供应商连接调度表。
+-- 这张表描述的是“平台如何与供应商执行同步调度”，不是供应商主数据。
+CREATE TABLE supplier_connection (
+    supplier_id            BIGINT        PRIMARY KEY,
+    supplier_code          VARCHAR(64)   NOT NULL,
+    status                 VARCHAR(32)   NOT NULL,
+    pull_interval_seconds  INT           NOT NULL,
+    next_pull_at           TIMESTAMP     NOT NULL,
+    last_success_at        TIMESTAMP,
+    last_error_at          TIMESTAMP,
+    last_cursor            VARCHAR(256),
+    retry_count            INT           NOT NULL,
+    lease_until            TIMESTAMP,
+    version                BIGINT        NOT NULL,
+    created_at             TIMESTAMP     NOT NULL,
+    updated_at             TIMESTAMP     NOT NULL
+);
+
+CREATE UNIQUE INDEX uk_supplier_connection_code
+    ON supplier_connection (supplier_code);
+
+CREATE INDEX idx_supplier_connection_schedule
+    ON supplier_connection (status, next_pull_at);
+
+CREATE INDEX idx_supplier_connection_lease
+    ON supplier_connection (lease_until);

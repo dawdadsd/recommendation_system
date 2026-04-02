@@ -148,3 +148,64 @@ INSERT INTO seckill_reservation (
         TIMESTAMP '2026-03-23 09:55:00',
         TIMESTAMP '2026-03-23 10:01:00'
     );
+
+INSERT INTO supplier_connection (
+    supplier_id,
+    supplier_code,
+    status,
+    pull_interval_seconds,
+    next_pull_at,
+    last_success_at,
+    last_error_at,
+    last_cursor,
+    retry_count,
+    lease_until,
+    version,
+    created_at,
+    updated_at
+) VALUES
+    (
+        9001,
+        'SUPPLIER_ALPHA',
+        'ACTIVE',
+        60,
+        TIMESTAMP '2026-04-02 15:00:00',
+        TIMESTAMP '2026-04-02 14:59:00',
+        NULL,
+        'cursor-9001-v1',
+        0,
+        NULL,
+        0,
+        TIMESTAMP '2026-04-02 14:50:00',
+        TIMESTAMP '2026-04-02 14:59:00'
+    ),
+    (
+        9002,
+        'SUPPLIER_FAIL_ONCE',
+        'ACTIVE',
+        120,
+        TIMESTAMP '2026-04-02 15:00:00',
+        NULL,
+        NULL,
+        NULL,
+        0,
+        NULL,
+        0,
+        TIMESTAMP '2026-04-02 14:50:00',
+        TIMESTAMP '2026-04-02 14:50:00'
+    ),
+    (
+        9003,
+        'SUPPLIER_PAUSED',
+        'PAUSED',
+        300,
+        TIMESTAMP '2026-04-02 15:00:00',
+        NULL,
+        NULL,
+        NULL,
+        0,
+        NULL,
+        0,
+        TIMESTAMP '2026-04-02 14:50:00',
+        TIMESTAMP '2026-04-02 14:50:00'
+    );
