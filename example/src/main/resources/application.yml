@@ -9,6 +9,11 @@ spring:
     driver-class-name: org.h2.Driver
     username: sa
     password:
+    hikari:
+      maximum-pool-size: 30
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
   h2:
     console:
       enabled: true
@@ -47,7 +52,18 @@ management:
       exposure:
         include: health,info
 
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: alpha
+    tags-sorter: alpha
+    display-request-duration: true
+    disable-swagger-default-url: true
+
 seckill:
+  redis:
+    warm-up:
+      enabled: false
   kafka:
     topic:
       reservation-created: seckill.reservation.created
@@ -57,6 +73,8 @@ supplier:
   kafka:
     topic:
       pull-request: supplier.pull.request
+      raw-data: supplier.raw.data
+      raw-dlq: supplier.raw.dlq
   scheduling:
     enabled: true
     fixed-delay-ms: 10000
@@ -65,3 +83,27 @@ supplier:
   worker:
     enabled: true
     retry-delay-seconds: 45
+    retry-backoff-base-seconds: 30
+    retry-backoff-max-seconds: 3600
+    retry-backoff-max-jitter-ms: 10000
+  load-test:
+    mock-publisher: false
+  erp:
+    kingdee:
+      base-url: https://your-kingdee-host/K3Cloud
+      acct-id: "123456789"
+      username: api_user
+      password: "5f4dcc3b5aa765d61d8327deb882cf99"
+      connect-timeout-ms: 5000
+      read-timeout-ms: 15000
+      page-size: 100
+      sandbox: true
+    yonyou:
+      base-url: https://open.yonyoucloud.com
+      app-id: "your_app_id"
+      app-secret: "your_app_secret"
+      corp-code: "your_corp_code"
+      connect-timeout-ms: 5000
+      read-timeout-ms: 15000
+      page-size: 100
+      sandbox: true

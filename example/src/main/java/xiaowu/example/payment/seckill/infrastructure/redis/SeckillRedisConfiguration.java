@@ -4,6 +4,7 @@ import java.util.List;
 
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -57,6 +58,10 @@ public class SeckillRedisConfiguration {
    * 让 reserve 路径正常工作的前提。
    */
   @Bean
+  @ConditionalOnProperty(
+      prefix = "seckill.redis.warm-up",
+      name = "enabled",
+      havingValue = "true")
   ApplicationRunner seckillStockCacheWarmUp(
       SeckillStockRepository stockRepository,
       StringRedisTemplate redisTemplate) {

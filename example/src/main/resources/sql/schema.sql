@@ -97,3 +97,41 @@ CREATE INDEX idx_supplier_connection_schedule
 
 CREATE INDEX idx_supplier_connection_lease
     ON supplier_connection (lease_until);
+
+-- ─── 供应商拉取幂等表 ──────────────────────────────────────────────────────────
+-- 防止 Kafka at-least-once 投递导致同一任务被重复执行。
+-- 幂等键格式：{supplierId}_{yyyyMMddHHmm}，精度为分钟级（同一分钟内只执行一次）。
+CREATE TABLE supplier_pull_idempotency (
+    id               BIGINT       AUTO_INCREMENT PRIMARY KEY,
+    supplier_id      BIGINT       NOT NULL,
+    idempotency_key  VARCHAR(64)  NOT NULL,
+    created_at       TIMESTAMP    NOT NULL
+);
+
+CREATE UNIQUE INDEX uk_supplier_pull_idempotency_key
+    ON supplier_pull_idempotency (idempotency_key);
+
+CREATE INDEX idx_supplier_pull_idempotency_supplier
+    ON supplier_pull_idempotency (supplier_id, created_at);
+
+-- ─── 供应商拉取审计流水表 ──────────────────────────────────────────────────────
+-- 每次拉取（成功、失败、跳过）均写一条审计记录，用于 SLA 统计和溯源。
+-- outcome 枚举值：SUCCESS / FAILURE / SKIPPED_DUPLICATE / CIRCUIT_OPEN
+CREATE TABLE supplier_pull_audit (
+    id             BIGINT        AUTO_INCREMENT PRIMARY KEY,
+    supplier_id    BIGINT        NOT NULL,
+    supplier_code  VARCHAR(64)   NOT NULL,
+    erp_type       VARCHAR(16)   NOT NULL,       -- KINGDEE / YONYOU / GENERIC
+    outcome        VARCHAR(32)   NOT NULL,
+    record_count   INT           NOT NULL DEFAULT 0,
+    error_kind     VARCHAR(32),                  -- AUTH_FAILURE / RATE_LIMITED / ...
+    error_message  VARCHAR(512),
+    duration_ms    BIGINT        NOT NULL DEFAULT 0,
+    executed_at    TIMESTAMP     NOT NULL
+);
+
+CREATE INDEX idx_supplier_pull_audit_supplier
+    ON supplier_pull_audit (supplier_id, executed_at DESC);
+
+CREATE INDEX idx_supplier_pull_audit_outcome
+    ON supplier_pull_audit (outcome, executed_at DESC);

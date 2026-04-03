@@ -209,3 +209,100 @@ INSERT INTO supplier_connection (
         TIMESTAMP '2026-04-02 14:50:00',
         TIMESTAMP '2026-04-02 14:50:00'
     );
+
+-- ─── 金蝶云星空（KD_ 前缀）供应商连接种子数据 ───────────────────────────────────
+-- sandbox=true 时适配器返回内置 mock 数据，无需真实金蝶环境；
+-- 将 application.yml 中 supplier.erp.kingdee.sandbox 改为 false 并填写真实凭证即可接入真实 ERP。
+INSERT INTO supplier_connection (
+    supplier_id, supplier_code, status, pull_interval_seconds,
+    next_pull_at, last_success_at, last_error_at, last_cursor,
+    retry_count, lease_until, version, created_at, updated_at
+) VALUES
+    (
+        -- 金蝶供应商-1：正常运行，已完成过一轮拉取
+        9101,
+        'KD_SUPPLIER_HANGZHOU',
+        'ACTIVE',
+        300,
+        TIMESTAMP '2026-04-02 15:00:00',
+        TIMESTAMP '2026-04-02 14:55:00',
+        NULL,
+        '2026-04-02 14:55:00|0',
+        0,
+        NULL,
+        1,
+        TIMESTAMP '2026-04-02 14:00:00',
+        TIMESTAMP '2026-04-02 14:55:00'
+    ),
+    (
+        -- 金蝶供应商-2：待首次拉取，用于演示分页游标从零开始
+        9102,
+        'KD_SUPPLIER_SHENZHEN',
+        'ACTIVE',
+        600,
+        TIMESTAMP '2026-04-02 15:00:00',
+        NULL,
+        NULL,
+        NULL,
+        0,
+        NULL,
+        0,
+        TIMESTAMP '2026-04-02 14:00:00',
+        TIMESTAMP '2026-04-02 14:00:00'
+    ),
+    (
+        -- 金蝶供应商-3：模拟鉴权失败被挂起（AUTH_FAILURE → SUSPENDED）
+        9103,
+        'KD_SUPPLIER_SUSPENDED',
+        'SUSPENDED',
+        300,
+        TIMESTAMP '2026-04-02 15:00:00',
+        NULL,
+        TIMESTAMP '2026-04-02 14:30:00',
+        NULL,
+        3,
+        NULL,
+        5,
+        TIMESTAMP '2026-04-02 14:00:00',
+        TIMESTAMP '2026-04-02 14:30:00'
+    );
+
+-- ─── 用友 BIP（YY_ 前缀）供应商连接种子数据 ──────────────────────────────────────
+-- sandbox=true 时适配器返回内置 mock 数据，无需真实用友 BIP 环境。
+INSERT INTO supplier_connection (
+    supplier_id, supplier_code, status, pull_interval_seconds,
+    next_pull_at, last_success_at, last_error_at, last_cursor,
+    retry_count, lease_until, version, created_at, updated_at
+) VALUES
+    (
+        -- 用友供应商-1：正常运行
+        9201,
+        'YY_SUPPLIER_BEIJING',
+        'ACTIVE',
+        300,
+        TIMESTAMP '2026-04-02 15:00:00',
+        TIMESTAMP '2026-04-02 14:56:00',
+        NULL,
+        '2026-04-02|1',
+        0,
+        NULL,
+        1,
+        TIMESTAMP '2026-04-02 14:00:00',
+        TIMESTAMP '2026-04-02 14:56:00'
+    ),
+    (
+        -- 用友供应商-2：曾被限流，等待重试（RATE_LIMITED 场景）
+        9202,
+        'YY_SUPPLIER_SHANGHAI',
+        'ACTIVE',
+        600,
+        TIMESTAMP '2026-04-02 16:00:00',
+        TIMESTAMP '2026-04-02 13:00:00',
+        TIMESTAMP '2026-04-02 14:00:00',
+        '2026-04-02|1',
+        2,
+        NULL,
+        3,
+        TIMESTAMP '2026-04-02 12:00:00',
+        TIMESTAMP '2026-04-02 14:00:00'
+    );

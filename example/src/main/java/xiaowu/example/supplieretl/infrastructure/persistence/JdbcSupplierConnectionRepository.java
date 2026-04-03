@@ -59,7 +59,10 @@ public class JdbcSupplierConnectionRepository implements SupplierConnectionRepos
       WHERE status = ?
         AND next_pull_at <= ?
         AND (lease_until IS NULL OR lease_until <= ?)
-      ORDER BY next_pull_at ASC, supplier_id ASC
+      ORDER BY
+          CASE WHEN retry_count >= 5 THEN 1 ELSE 0 END ASC,
+          next_pull_at ASC,
+          supplier_id ASC
       LIMIT ?
       """;
 
@@ -151,6 +154,19 @@ public class JdbcSupplierConnectionRepository implements SupplierConnectionRepos
       WHERE supplier_id = ?
         AND status = ?
         AND version = ?
+      """;
+
+  private static final String MARK_SUSPENDED_SQL = """
+      UPDATE supplier_connection
+      SET
+          status = ?,
+          last_error_at = ?,
+          lease_until = NULL,
+          version = version + 1,
+          updated_at = ?
+      WHERE supplier_id = ?
+        AND version = ?
+        AND status != ?
       """;
 
   private final JdbcTemplate jdbcTemplate;
@@ -279,6 +295,24 @@ public class JdbcSupplierConnectionRepository implements SupplierConnectionRepos
         supplierId,
         ConnectionStatus.ACTIVE.name(),
         expectedVersion);
+    return affectedRows > 0;
+  }
+
+  @Override
+  public boolean markSuspended(
+      Long supplierId,
+      long expectedVersion,
+      LocalDateTime lastErrorAt,
+      LocalDateTime updatedAt) {
+
+    int affectedRows = jdbcTemplate.update(
+        MARK_SUSPENDED_SQL,
+        ConnectionStatus.SUSPENDED.name(),
+        toTimestamp(lastErrorAt),
+        toTimestamp(updatedAt),
+        supplierId,
+        expectedVersion,
+        ConnectionStatus.SUSPENDED.name()); // 已是 SUSPENDED 则跳过，防止重复写
     return affectedRows > 0;
   }
 

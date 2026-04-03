@@ -1,6 +1,5 @@
 package xiaowu.example.supplieretl.infrastructure.kafka;
 
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
@@ -20,7 +19,6 @@ import xiaowu.example.supplieretl.infrastructure.config.SupplierWorkerProperties
 @Slf4j
 @Component
 @RequiredArgsConstructor
-@ConditionalOnBean(SupplierPullExecutionApplicationService.class)
 @ConditionalOnProperty(prefix = "supplier.worker", name = "enabled", havingValue = "true", matchIfMissing = true)
 public class SupplierPullTaskConsumer {
 
@@ -34,7 +32,10 @@ public class SupplierPullTaskConsumer {
       PullRequestedEvent event = objectMapper.readValue(payload, PullRequestedEvent.class);
       var result = executionApplicationService.execute(new ExecuteCommand(
           event.supplierId(),
-          workerProperties.retryDelaySeconds()));
+          workerProperties.retryDelaySeconds(),
+          workerProperties.retryBackoffBaseSeconds(),
+          workerProperties.retryBackoffMaxSeconds(),
+          workerProperties.retryBackoffMaxJitterMs()));
 
       if (result.success()) {
         log.info(

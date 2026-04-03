@@ -1,6 +1,5 @@
 package xiaowu.example.supplieretl.infrastructure.scheduling;
 
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -14,7 +13,6 @@ import xiaowu.example.supplieretl.infrastructure.config.SupplierSchedulingProper
 @Slf4j
 @Component
 @RequiredArgsConstructor
-@ConditionalOnBean(SupplierPullSchedulingApplicationService.class)
 @ConditionalOnProperty(prefix = "supplier.scheduling", name = "enabled", havingValue = "true", matchIfMissing = true)
 public class SupplierPullSchedulingJob {
 
