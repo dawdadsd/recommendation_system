@@ -20,7 +20,7 @@ import xiaowu.example.supplieretl.infrastructure.adapter.kingdee.KingdeeErpPrope
 import xiaowu.example.supplieretl.infrastructure.adapter.yonyou.YonyouErpAdapter;
 import xiaowu.example.supplieretl.infrastructure.adapter.yonyou.YonyouErpProperties;
 import xiaowu.example.supplieretl.infrastructure.audit.SupplierPullAuditRepository;
-import xiaowu.example.supplieretl.infrastructure.kafka.SupplierPullTaskConsumer;
+import xiaowu.example.supplieretl.infrastructure.kafka.consumer.SupplierPullTaskConsumer;
 import xiaowu.example.supplieretl.infrastructure.mock.MockSupplierPullClient;
 
 @Configuration(proxyBeanMethods = false)

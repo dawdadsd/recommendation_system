@@ -140,6 +140,7 @@ public class YonyouErpAdapter implements SupplierPullClient {
         .build();
 
     HttpResponse<String> resp = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+    String rawPayload = resp.body();
     handleHttpErrors(command.supplierId(), resp);
 
     // ── 解析响应 ──────────────────────────────────────────────────────────────
@@ -164,7 +165,7 @@ public class YonyouErpAdapter implements SupplierPullClient {
     log.info("[Yonyou] pull done supplierId={} count={} hasMore={} nextCursor={}",
         command.supplierId(), count, hasMore, nextCursor);
 
-    return new PullResult(nextCursor, count, LocalDateTime.now());
+    return new PullResult(nextCursor, count, LocalDateTime.now(), rawPayload);
   }
 
   // ─── Token 管理 ───────────────────────────────────────────────────────────────
@@ -234,7 +235,18 @@ public class YonyouErpAdapter implements SupplierPullClient {
     CursorParts cursor = CursorParts.parse(command.lastCursor());
     if (cursor.pageIndex > 2) {
       log.debug("[Yonyou-Sandbox] supplierId={} no more pages", command.supplierId());
-      return new PullResult(command.lastCursor(), 0, LocalDateTime.now());
+      return new PullResult(
+          command.lastCursor(),
+          0,
+          LocalDateTime.now(),
+          writePayload(Map.of(
+              "code", 0,
+              "data", Map.of(
+                  "rows", List.of(),
+                  "totalCount", 0,
+                  "pageIndex", cursor.pageIndex,
+                  "hasMore", false)),
+              command.supplierId()));
     }
 
     String today = LocalDate.now().format(YY_DATE_FMT);
@@ -246,14 +258,26 @@ public class YonyouErpAdapter implements SupplierPullClient {
         Map.of("code", "YY_SUP_003", "name", "用友ERP示例-东莞外协厂", "status", "N",
             "taxNo", "914400000000000003", "modifyDate", today));
 
-    String nextCursor = cursor.pageIndex < 2
+    boolean hasMore = cursor.pageIndex < 2;
+    String nextCursor = hasMore
         ? new CursorParts(today, cursor.pageIndex + 1).encode()
         : new CursorParts(today, 1).encode();
 
     log.debug("[Yonyou-Sandbox] supplierId={} page={} returning {} rows",
         command.supplierId(), cursor.pageIndex, rows.size());
 
-    return new PullResult(nextCursor, rows.size(), LocalDateTime.now());
+    return new PullResult(
+        nextCursor,
+        rows.size(),
+        LocalDateTime.now(),
+        writePayload(Map.of(
+            "code", 0,
+            "data", Map.of(
+                "rows", rows,
+                "totalCount", rows.size(),
+                "pageIndex", cursor.pageIndex,
+                "hasMore", hasMore)),
+            command.supplierId()));
   }
 
   // ─── 工具方法 ─────────────────────────────────────────────────────────────────
@@ -296,6 +320,14 @@ public class YonyouErpAdapter implements SupplierPullClient {
 
   private static String snippet(String s) {
     return s == null ? "" : s.substring(0, Math.min(512, s.length()));
+  }
+
+  private String writePayload(Object payload, long supplierId) {
+    try {
+      return objectMapper.writeValueAsString(payload);
+    } catch (IOException ex) {
+      throw new SupplierFetchException.DataException(supplierId, snippet(String.valueOf(payload)), ex);
+    }
   }
 
   // ─── 游标编解码 ───────────────────────────────────────────────────────────────

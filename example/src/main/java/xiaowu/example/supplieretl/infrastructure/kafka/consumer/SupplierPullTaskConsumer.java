@@ -1,4 +1,4 @@
-package xiaowu.example.supplieretl.infrastructure.kafka;
+package xiaowu.example.supplieretl.infrastructure.kafka.consumer;
 
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -29,6 +29,7 @@ public class SupplierPullTaskConsumer {
   @KafkaListener(topics = "${supplier.kafka.topic.pull-request}")
   public void onMessage(String payload) {
     try {
+      // 反序列化为对象
       PullRequestedEvent event = objectMapper.readValue(payload, PullRequestedEvent.class);
       var result = executionApplicationService.execute(new ExecuteCommand(
           event.supplierId(),

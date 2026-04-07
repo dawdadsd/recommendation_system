@@ -22,7 +22,7 @@ import xiaowu.example.supplieretl.infrastructure.audit.SupplierPullAuditReposito
  * 调度单个供应商拉取任务后执行该任务。
  *
  * <h2>完整执行流程</h2>
- * 
+ *
  * <pre>
  *  1. 幂等检查（supplier_pull_idempotency），重复投递直接返回 SKIPPED
  *  2. 从 DB 加载 SupplierConnection（乐观锁版本）
@@ -70,9 +70,8 @@ public class SupplierPullExecutionApplicationService {
                 if (command.retryDelaySeconds() <= 0) {
                         throw new IllegalArgumentException("retryDelaySeconds must be positive");
                 }
-
                 long startMs = System.currentTimeMillis();
-
+                // 查找供应商连接信息
                 SupplierConnection connection = supplierConnectionRepository
                                 .findBySupplierId(command.supplierId())
                                 .orElseThrow(() -> new IllegalStateException(
@@ -89,13 +88,14 @@ public class SupplierPullExecutionApplicationService {
 
                 long expectedVersion = connection.getVersion();
                 String erpType = resolveErpType(connection.getSupplierCode());
+                String previousCursor = connection.getLastCursor();
 
                 // ── 2. 执行拉取 ───────────────────────────────────────────────────────
                 try {
                         var pullResult = supplierPullClient.pull(new PullCommand(
                                         connection.getSupplierId(),
                                         connection.getSupplierCode(),
-                                        connection.getLastCursor(),
+                                        previousCursor,
                                         connection.getRetryCount()));
 
                         LocalDateTime pulledAt = Objects.requireNonNullElseGet(
@@ -125,8 +125,8 @@ public class SupplierPullExecutionApplicationService {
                                         connection.getSupplierId(),
                                         connection.getSupplierCode(),
                                         erpType,
-                                        buildRawPayload(connection, pullResult),
-                                        connection.getLastCursor(),
+                                        requireRawPayload(pullResult),
+                                        previousCursor,
                                         pullResult.nextCursor(),
                                         pulledAt.toInstant(ZoneOffset.UTC),
                                         pullResult.recordCount()));
@@ -258,12 +258,12 @@ public class SupplierPullExecutionApplicationService {
                 return ERP_GENERIC;
         }
 
-        private static String buildRawPayload(SupplierConnection conn, SupplierPullClient.PullResult result) {
-                return "{\"supplierId\":" + conn.getSupplierId()
-                                + ",\"supplierCode\":\"" + conn.getSupplierCode() + "\""
-                                + ",\"recordCount\":" + result.recordCount()
-                                + ",\"nextCursor\":\"" + (result.nextCursor() == null ? "" : result.nextCursor()) + "\""
-                                + ",\"pulledAt\":\"" + result.pulledAt() + "\"}";
+        private static String requireRawPayload(SupplierPullClient.PullResult result) {
+                String rawPayload = result.rawPayload();
+                if (rawPayload == null || rawPayload.isBlank()) {
+                        throw new IllegalStateException("Supplier pull result rawPayload must not be blank");
+                }
+                return rawPayload;
         }
 
         private LocalDateTime computeRateLimitRetryAt(
@@ -319,7 +319,9 @@ public class SupplierPullExecutionApplicationService {
         }
 
         // ─── 命令 / 结果记录 ──────────────────────────────────────────────────────────
-
+        /**
+         * 供应商拉取任务的执行命令参数。
+         */
         public record ExecuteCommand(
                         Long supplierId,
                         int retryDelaySeconds,

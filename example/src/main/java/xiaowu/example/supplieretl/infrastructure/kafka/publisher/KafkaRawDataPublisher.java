@@ -1,4 +1,4 @@
-package xiaowu.example.supplieretl.infrastructure.kafka;
+package xiaowu.example.supplieretl.infrastructure.kafka.publisher;
 
 import java.util.Objects;
 
@@ -8,6 +8,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import lombok.extern.slf4j.Slf4j;
 import xiaowu.example.supplieretl.application.port.RawDataPublisher;
+import xiaowu.example.supplieretl.infrastructure.kafka.SupplierKafkaProperties;
 
 /**
  * {@link RawDataPublisher} 的 Kafka 实现。
@@ -48,6 +49,7 @@ public class KafkaRawDataPublisher implements RawDataPublisher {
 
   @Override
   public void publish(RawDataEvent event) {
+    // 参数校验，防止 NullPointerException 导致 KafkaTemplate 发送失败后无法捕获到具体事件信息
     Objects.requireNonNull(event, "event");
     String key = String.valueOf(event.supplierId());
     String payload = serialize(event);
@@ -81,6 +83,21 @@ public class KafkaRawDataPublisher implements RawDataPublisher {
     }
   }
 
+  /**
+   * 序列化 : 把"对象" 转换成可传输，可存储的格式，比如JSON，字节数组
+   * 反序列化： 把可传输，可存储的格式转换成对象
+   *
+   * @example {
+   *          "supplierId": 1,
+   *          "supplierCode": "KD_001",
+   *          "erpType": "KINGDEE",
+   *          "rawPayload": "{\"items\":[1,2,3]}"
+   *          }
+   *
+   *
+   * @param obj
+   * @return
+   */
   private String serialize(Object obj) {
     try {
       return objectMapper.writeValueAsString(obj);

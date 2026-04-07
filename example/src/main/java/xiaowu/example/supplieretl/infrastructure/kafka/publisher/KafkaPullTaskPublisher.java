@@ -1,4 +1,4 @@
-package xiaowu.example.supplieretl.infrastructure.kafka;
+package xiaowu.example.supplieretl.infrastructure.kafka.publisher;
 
 import java.util.Objects;
 
@@ -7,6 +7,7 @@ import org.springframework.kafka.core.KafkaTemplate;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import xiaowu.example.supplieretl.application.port.PullTaskPublisher;
+import xiaowu.example.supplieretl.infrastructure.kafka.SupplierKafkaProperties;
 
 /**
  * Kafka implementation of {@link PullTaskPublisher}.
@@ -31,6 +32,7 @@ public class KafkaPullTaskPublisher implements PullTaskPublisher {
     Objects.requireNonNull(event, "event");
     try {
       String payload = objectMapper.writeValueAsString(event);
+      // send params : topic,key,payload
       kafkaTemplate.send(
           properties.topic().pullRequest(),
           String.valueOf(event.supplierId()),

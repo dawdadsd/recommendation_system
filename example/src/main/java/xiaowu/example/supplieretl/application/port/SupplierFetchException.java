@@ -29,6 +29,8 @@ public sealed class SupplierFetchException extends RuntimeException
   private final FailureKind kind;
 
   private SupplierFetchException(long supplierId, FailureKind kind, String message, Throwable cause) {
+    // supper关键字调用必须放在第一行，无法在调用前进行字段赋值，因此 supplierId 和 kind 只能在子类构造器中传入并通过 super()
+    // 传递到这里
     super(message, cause);
     this.supplierId = supplierId;
     this.kind = kind;

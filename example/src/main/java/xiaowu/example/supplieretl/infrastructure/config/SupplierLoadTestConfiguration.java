@@ -5,7 +5,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import xiaowu.example.supplieretl.application.port.RawDataPublisher;
-import xiaowu.example.supplieretl.infrastructure.kafka.SupplierKafkaConfiguration;
+import xiaowu.example.supplieretl.infrastructure.kafka.config.SupplierKafkaConfiguration;
 import xiaowu.example.supplieretl.infrastructure.loadtest.NoOpRawDataPublisher;
 
 /**

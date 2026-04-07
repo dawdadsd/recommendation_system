@@ -34,7 +34,8 @@ public class SupplierPullSchedulingApplicationService {
 
   /**
    * 调度到期的供应商连接，尝试获取租约并发布拉取请求。
-   *
+   * 
+   * @doc : 默认发布到kafkfa
    * @param command 调度命令，包含批次大小和租约秒数
    * @return 调度结果，包含扫描的连接数、成功获取租约数、成功发布任务数和发布失败的供应商ID列表
    */
@@ -68,6 +69,7 @@ public class SupplierPullSchedulingApplicationService {
       connection.acquireLease(leaseUntil);
 
       try {
+        // 默认情况下会发布到kafka，因为在configuration中绑定了SupplierKafkaConfiguration
         pullTaskPublisher.publishPullRequested(new PullRequestedEvent(
             connection.getSupplierId(),
             connection.getSupplierCode(),

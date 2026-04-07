@@ -43,8 +43,10 @@ public class SupplierCircuitBreaker {
   }
 
   private final String name;
-  private final int failureThreshold; // 连续失败多少次后打开熔断
-  private final long openWindowMs; // OPEN 状态持续时长（ms），之后转 HALF_OPEN
+  // 连续失败多少次后打开熔断
+  private final int failureThreshold;
+  // OPEN 状态持续时长（ms），之后转 HALF_OPEN
+  private final long openWindowMs;
 
   private final AtomicReference<State> state = new AtomicReference<>(State.CLOSED);
   private final AtomicInteger failureCount = new AtomicInteger(0);
@@ -90,7 +92,14 @@ public class SupplierCircuitBreaker {
   }
 
   // ─── 状态转换 ─────────────────────────────────────────────────────────────────
-
+  /**
+   * checkState()流程 :
+   * 1.检查是否需要从open ->
+   * half_open,如果当前状态是open，并且已经超过openWindowMs时间，则尝试转换到half_open状态。
+   * 2.检查当前状态，如果是CLOSED，直接返回。
+   * 如果是OPEN，抛出CircuitOpenException异常，调用方无需重试。
+   * 如果是HALF_OPEN，尝试设置probeInFlight为true，如果已经有探针在飞行中，则抛出CircuitOpenException异常；否则允许当前请求作为探针通过。
+   */
   private void checkState() {
     maybeTransitionToHalfOpen();
     State s = state.get();

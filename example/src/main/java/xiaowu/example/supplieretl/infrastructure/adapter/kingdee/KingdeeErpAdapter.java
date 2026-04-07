@@ -191,6 +191,7 @@ public class KingdeeErpAdapter implements SupplierPullClient {
     if (resp.statusCode() == 429) {
       throw new SupplierFetchException.RateLimitedException(command.supplierId(), null);
     }
+    String rawPayload = resp.body();
     checkHttpStatus(command.supplierId(), resp.statusCode(), resp.body());
 
     // ── 解析响应 ──────────────────────────────────────────────────────────────
@@ -219,7 +220,7 @@ public class KingdeeErpAdapter implements SupplierPullClient {
     log.info("[Kingdee] pull done supplierId={} count={} nextCursor={}",
         command.supplierId(), count, nextCursor);
 
-    return new PullResult(nextCursor, count, LocalDateTime.now());
+    return new PullResult(nextCursor, count, LocalDateTime.now(), rawPayload);
   }
 
   // ─── Sandbox 模式（内置 mock，驱动 ETL 测试）────────────────────────────────────
@@ -238,7 +239,7 @@ public class KingdeeErpAdapter implements SupplierPullClient {
     // 每次最多返回 2 页，之后 nextCursor 不变（幂等测试）
     if (page >= 2) {
       log.debug("[Kingdee-Sandbox] supplierId={} no more pages", command.supplierId());
-      return new PullResult(command.lastCursor(), 0, LocalDateTime.now());
+      return new PullResult(command.lastCursor(), 0, LocalDateTime.now(), "[]");
     }
 
     String modDate = LocalDateTime.now().format(KD_DATE_FMT);
@@ -251,7 +252,7 @@ public class KingdeeErpAdapter implements SupplierPullClient {
     log.debug("[Kingdee-Sandbox] supplierId={} returning {} rows nextCursor={}",
         command.supplierId(), rows.size(), nextCursor);
 
-    return new PullResult(nextCursor, rows.size(), LocalDateTime.now());
+    return new PullResult(nextCursor, rows.size(), LocalDateTime.now(), writePayload(rows, command.supplierId()));
   }
 
   // ─── 工具方法 ─────────────────────────────────────────────────────────────────
@@ -282,6 +283,14 @@ public class KingdeeErpAdapter implements SupplierPullClient {
 
   private static String snippet(String s) {
     return s == null ? "" : s.substring(0, Math.min(512, s.length()));
+  }
+
+  private String writePayload(Object payload, long supplierId) {
+    try {
+      return objectMapper.writeValueAsString(payload);
+    } catch (IOException ex) {
+      throw new SupplierFetchException.DataException(supplierId, snippet(String.valueOf(payload)), ex);
+    }
   }
 
   // ─── 游标编解码 ───────────────────────────────────────────────────────────────

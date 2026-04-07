@@ -1,4 +1,4 @@
-package xiaowu.example.supplieretl.infrastructure.kafka;
+package xiaowu.example.supplieretl.infrastructure.kafka.config;
 
 import org.apache.kafka.clients.admin.NewTopic;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -12,6 +12,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import xiaowu.example.supplieretl.application.port.PullTaskPublisher;
 import xiaowu.example.supplieretl.application.port.RawDataPublisher;
+import xiaowu.example.supplieretl.infrastructure.kafka.SupplierKafkaProperties;
+import xiaowu.example.supplieretl.infrastructure.kafka.publisher.KafkaPullTaskPublisher;
+import xiaowu.example.supplieretl.infrastructure.kafka.publisher.KafkaRawDataPublisher;
 
 @Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties(SupplierKafkaProperties.class)
@@ -44,6 +47,16 @@ public class SupplierKafkaConfiguration {
         .build();
   }
 
+  /**
+   * 供应商拉取任务发布器，默认实现是基于 Kafka 的 {@link KafkaPullTaskPublisher}。
+   * 通过 @ConditionalOnMissingBean 注解允许用户自定义实现替代默认的 Kafka 发布器，
+   * 例如直接调用 Worker 的 REST API 等。
+   *
+   * @param kafkaTemplate Spring Kafka 的模板类，用于发送消息
+   * @param objectMapper  Jackson 的对象映射器，用于序列化消息对象为 JSON
+   * @param properties    供应商 Kafka 相关配置，包含主题名称等
+   * @return PullTaskPublisher 接口的实现实例
+   */
   @Bean
   @ConditionalOnMissingBean(PullTaskPublisher.class)
   PullTaskPublisher pullTaskPublisher(

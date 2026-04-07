@@ -42,8 +42,6 @@ public interface SupplierPullAuditRepository {
    */
   Optional<AuditEntry> findLatest(long supplierId);
 
-  // ─── 审计记录 ─────────────────────────────────────────────────────────────────
-
   /**
    * @param supplierId   供应商 ID
    * @param supplierCode 供应商编码
