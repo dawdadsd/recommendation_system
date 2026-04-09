@@ -17,7 +17,8 @@ public record NormalizedSupplierRecord(
     String sourceRecordId,
     String sourceBusinessCode,
     String supplierName,
-    String supplierStatus,
+    String sourceSupplierStatus,
+    CanonicalSupplierStatus supplierStatus,
     String taxNo,
     String sourceModifiedAt,
     String pageToken,
@@ -35,7 +36,10 @@ public record NormalizedSupplierRecord(
     sourceRecordId = requireText(sourceRecordId, "sourceRecordId must not be blank");
     sourceBusinessCode = requireText(sourceBusinessCode, "sourceBusinessCode must not be blank");
     supplierName = requireText(supplierName, "supplierName must not be blank");
-    supplierStatus = requireText(supplierStatus, "supplierStatus must not be blank");
+    sourceSupplierStatus = requireText(
+        sourceSupplierStatus,
+        "sourceSupplierStatus must not be blank");
+    supplierStatus = Objects.requireNonNull(supplierStatus, "supplierStatus must not be null");
 
     taxNo = normalizeNullableText(taxNo);
     sourceModifiedAt = normalizeNullableText(sourceModifiedAt);

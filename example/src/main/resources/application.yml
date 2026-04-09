@@ -75,6 +75,8 @@ supplier:
       pull-request: supplier.pull.request
       raw-data: supplier.raw.data
       raw-dlq: supplier.raw.dlq
+    consumer:
+      raw-data-group-id: example-supplier-raw-data-worker
   scheduling:
     enabled: true
     fixed-delay-ms: 10000
@@ -86,6 +88,8 @@ supplier:
     retry-backoff-base-seconds: 30
     retry-backoff-max-seconds: 3600
     retry-backoff-max-jitter-ms: 10000
+  raw-data-consumer:
+    enabled: true
   load-test:
     mock-publisher: false
   erp:

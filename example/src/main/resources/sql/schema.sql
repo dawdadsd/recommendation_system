@@ -135,3 +135,35 @@ CREATE INDEX idx_supplier_pull_audit_supplier
 
 CREATE INDEX idx_supplier_pull_audit_outcome
     ON supplier_pull_audit (outcome, executed_at DESC);
+
+-- 标准化后的供应商结果表。
+-- 一条 ERP 原始记录经过 parser 转换后，会以统一结构落到这里，
+-- 供后续查询、分析或继续加工使用。
+CREATE TABLE supplier_normalized_record (
+    id                    BIGINT        AUTO_INCREMENT PRIMARY KEY,
+    supplier_id           BIGINT        NOT NULL,
+    supplier_code         VARCHAR(64)   NOT NULL,
+    erp_type              VARCHAR(16)   NOT NULL,
+    source_record_id      VARCHAR(128)  NOT NULL,
+    source_business_code  VARCHAR(128)  NOT NULL,
+    supplier_name         VARCHAR(255)  NOT NULL,
+    source_supplier_status VARCHAR(64)  NOT NULL,
+    supplier_status       VARCHAR(64)   NOT NULL,
+    tax_no                VARCHAR(64)   NOT NULL,
+    source_modified_at    VARCHAR(64)   NOT NULL,
+    page_token            VARCHAR(256)  NOT NULL,
+    next_page_token       VARCHAR(256)  NOT NULL,
+    last_pulled_at        TIMESTAMP     NOT NULL,
+    raw_item_json         CLOB          NOT NULL,
+    created_at            TIMESTAMP     NOT NULL,
+    updated_at            TIMESTAMP     NOT NULL
+);
+
+CREATE UNIQUE INDEX uk_supplier_normalized_record_source
+    ON supplier_normalized_record (supplier_id, erp_type, source_record_id);
+
+CREATE INDEX idx_supplier_normalized_record_supplier
+    ON supplier_normalized_record (supplier_id, last_pulled_at DESC);
+
+CREATE INDEX idx_supplier_normalized_record_business_code
+    ON supplier_normalized_record (supplier_id, source_business_code);

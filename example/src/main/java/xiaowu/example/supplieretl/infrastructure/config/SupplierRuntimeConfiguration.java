@@ -10,9 +10,12 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import xiaowu.example.supplieretl.application.etl.parser.SupplierRawPayloadParserDispatcher;
+import xiaowu.example.supplieretl.application.port.NormalizedSupplierRecordRepository;
 import xiaowu.example.supplieretl.application.port.RawDataPublisher;
 import xiaowu.example.supplieretl.application.port.SupplierPullClient;
 import xiaowu.example.supplieretl.application.service.SupplierPullExecutionApplicationService;
+import xiaowu.example.supplieretl.application.service.SupplierRawDataProcessingApplicationService;
 import xiaowu.example.supplieretl.domain.repository.SupplierConnectionRepository;
 import xiaowu.example.supplieretl.infrastructure.adapter.RoutingSupplierPullClient;
 import xiaowu.example.supplieretl.infrastructure.adapter.kingdee.KingdeeErpAdapter;
@@ -79,5 +82,16 @@ public class SupplierRuntimeConfiguration {
         routingSupplierPullClient,
         rawDataPublisher,
         auditRepository);
+  }
+
+  @Bean
+  SupplierRawDataProcessingApplicationService supplierRawDataProcessingApplicationService(
+      SupplierRawPayloadParserDispatcher parserDispatcher,
+      NormalizedSupplierRecordRepository normalizedSupplierRecordRepository,
+      RawDataPublisher rawDataPublisher) {
+    return new SupplierRawDataProcessingApplicationService(
+        parserDispatcher,
+        normalizedSupplierRecordRepository,
+        rawDataPublisher);
   }
 }
