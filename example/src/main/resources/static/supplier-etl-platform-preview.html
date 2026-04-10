@@ -1,368 +1,898 @@
 <!doctype html>
 <html lang="zh-CN">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Rule-Driven ETL Platform</title>
-  <link rel="stylesheet" href="styles/supplier-etl-platform-preview.css">
-  <script src="scripts/supplier-etl-platform-preview.js" defer></script>
-</head>
-<body>
-  <div class="page-shell">
-    <header class="landing-hero">
-      <div class="hero-copy">
-        <p class="eyebrow">Data Integration Landing Page</p>
-        <h1>一个让 ERP、支付、人员数据自动接入、清洗、治理和回放的平台</h1>
-        <p class="hero-text">
-          数据源先进入 Kafka，平台根据规则版本自动执行字段提取、状态映射、金额标准化、数据校验、落库分层与异常回放。
-          这不是一堆脚本，而是一套可配置、可追溯、可演示的数据平台。
-        </p>
-        <div class="hero-actions">
-          <a class="primary-action" href="#demo-stage">观看系统演示</a>
-          <a class="ghost-action" href="#capabilities">查看平台能力</a>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Rule-Driven ETL Platform</title>
+    <link rel="stylesheet" href="styles/supplier-etl-platform-preview.css" />
+    <script src="scripts/supplier-etl-platform-preview.js" defer></script>
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="landing-hero">
+        <canvas id="earth-network" aria-hidden="true"></canvas>
+        <div class="hero-copy">
+          <p class="eyebrow">Data Integration Landing Page</p>
+          <h1>一个让 ERP、支付、人员数据自动接入、清洗、治理和回放的平台</h1>
+          <div
+            class="hero-text pretext-prose"
+            data-pretext-source="hero-pretext-source"
+          >
+            数据源先进入
+            Kafka，平台根据规则版本自动执行字段提取、状态映射、金额标准化、数据校验、落库分层与异常回放。
+            这不是一堆脚本，而是一套可配置、可追溯、可演示的数据平台。
+          </div>
+          <div class="hero-actions">
+            <a class="primary-action" href="#demo-stage">观看系统演示</a>
+            <a class="ghost-action" href="#capabilities">查看平台能力</a>
+          </div>
+          <div class="hero-stats">
+            <article>
+              <span>数据来源</span>
+              <strong>42</strong>
+            </article>
+            <article>
+              <span>规则版本</span>
+              <strong>128</strong>
+            </article>
+            <article>
+              <span>回放队列</span>
+              <strong>DLQ + Replay</strong>
+            </article>
+          </div>
         </div>
-        <div class="hero-stats">
-          <article>
-            <span>数据来源</span>
-            <strong>42</strong>
+
+        <section class="hero-orbit-notes" aria-label="Platform highlights">
+          <article class="orbit-note orbit-note-primary" data-hero-note="erp">
+            <span class="orbit-note-kicker">ERP / Payment / HR</span>
+            <h3>统一接入，不再一套来源一套脚本</h3>
+            <p>原始事件进入 Kafka，字段映射、状态归一、审计回放统一收敛到一条主链路。</p>
           </article>
-          <article>
-            <span>规则版本</span>
-            <strong>128</strong>
+
+          <article class="orbit-note orbit-note-secondary" data-hero-note="governance">
+            <span class="orbit-note-kicker">Governance</span>
+            <p>坏数据隔离、规则回放、血缘追踪和连接审计都在平台内完成。</p>
           </article>
-          <article>
-            <span>回放队列</span>
-            <strong>DLQ + Replay</strong>
+
+          <article class="orbit-note orbit-note-tertiary" data-hero-note="documents">
+            <span class="orbit-note-kicker">Docs / Excel</span>
+            <p>非结构化文件也能进入统一入口，先测试连接和解析，再决定是否导入。</p>
           </article>
-        </div>
-      </div>
 
-      <section class="hero-stage-card">
-        <div class="stage-card-topbar">
-          <span class="window-dot"></span>
-          <span class="window-dot"></span>
-          <span class="window-dot"></span>
-          <p>rule-driven-data-platform.demo</p>
-        </div>
-        <div class="mini-stage">
-          <div class="mini-stage-sidebar">
-            <span class="sidebar-chip active">ERP</span>
-            <span class="sidebar-chip">Payment</span>
-            <span class="sidebar-chip">HR</span>
-          </div>
-          <div class="mini-stage-flow">
-            <div class="mini-node active">Raw</div>
-            <div class="mini-link"></div>
-            <div class="mini-node active">Rules</div>
-            <div class="mini-link"></div>
-            <div class="mini-node active">Cleaned</div>
-          </div>
-          <div class="mini-stage-metrics">
-            <div class="mini-metric">
-              <span>Throughput</span>
-              <strong>18.4k/min</strong>
-            </div>
-            <div class="mini-metric">
-              <span>Dirty Rate</span>
-              <strong>0.7%</strong>
-            </div>
-          </div>
-        </div>
-      </section>
-    </header>
-
-    <main>
-      <section class="demo-stage-section" id="demo-stage">
-        <div class="section-copy">
-          <p class="section-kicker">System Walkthrough</p>
-          <h2>像演示文稿一样，自动讲解系统如何接入、处理和治理数据</h2>
-          <p>
-            下面这块舞台会自动播放一段完整演示。它会依次展示虚拟的 ERP 供应商、支付流水、人员信息是如何进入 Kafka，
-            如何匹配规则、如何执行标准化、如何落到分层表，以及如何被审计和回放。
-          </p>
-        </div>
-
-        <section class="demo-stage" aria-label="System demo stage">
-          <div class="demo-topbar">
-            <div class="demo-brand">
-              <span class="brand-mark">RD</span>
-              <div>
-                <p class="brand-kicker">Rule-Driven ETL</p>
-                <strong>Platform Console</strong>
-              </div>
-            </div>
-
-            <div class="demo-controls">
-              <button class="demo-toggle" type="button" data-autoplay-toggle aria-pressed="true">
-                自动播放中
-              </button>
-              <div class="demo-progress">
-                <span class="demo-progress-bar" data-scene-progress></span>
-              </div>
-            </div>
-          </div>
-
-          <div class="demo-grid">
-            <aside class="console-sidebar">
-              <div class="sidebar-block">
-                <p class="sidebar-title">数据域</p>
-                <button class="sidebar-item is-current" type="button" data-scene-button="erp">
-                  <span class="sidebar-dot erp"></span>
-                  ERP 主数据
-                </button>
-                <button class="sidebar-item" type="button" data-scene-button="payment">
-                  <span class="sidebar-dot payment"></span>
-                  支付流水
-                </button>
-                <button class="sidebar-item" type="button" data-scene-button="hr">
-                  <span class="sidebar-dot hr"></span>
-                  人员组织
-                </button>
-                <button class="sidebar-item" type="button" data-scene-button="governance">
-                  <span class="sidebar-dot ops"></span>
-                  治理回放
-                </button>
-              </div>
-
-              <div class="sidebar-block">
-                <p class="sidebar-title">实时指标</p>
-                <div class="metric-strip">
-                  <span>成功率</span>
-                  <strong id="metric-success-rate">99.3%</strong>
-                </div>
-                <div class="metric-strip">
-                  <span>DLQ</span>
-                  <strong id="metric-dlq">12</strong>
-                </div>
-                <div class="metric-strip">
-                  <span>Replay</span>
-                  <strong id="metric-replay">4</strong>
-                </div>
-              </div>
-            </aside>
-
-            <section class="console-main">
-              <div class="story-banner">
-                <div>
-                  <p class="story-kicker">Animated Narrative</p>
-                  <h3 id="scene-title">ERP 供应商数据接入</h3>
-                </div>
-                <p class="story-text" id="scene-text">
-                  金蝶和用友的供应商主数据先进入统一事件封套，系统随后按规则版本统一状态、时间和税号口径。
-                </p>
-              </div>
-
-              <div class="presentation-canvas">
-                <div class="canvas-column source-lane" data-scene-panel="erp">
-                  <div class="canvas-head">
-                    <span>Source Connectors</span>
-                    <strong id="source-label">ERP Master Data</strong>
-                  </div>
-                  <div class="source-stack">
-                    <article class="source-ticket is-live" data-ticket="erp">
-                      <span class="ticket-type">ERP</span>
-                      <strong>KINGDEE_SUPPLIER_SYNC</strong>
-                      <p>supplierCode=KD_SUP_001 · status=A</p>
-                    </article>
-                    <article class="source-ticket" data-ticket="payment">
-                      <span class="ticket-type">PAY</span>
-                      <strong>ALIPAY_TRADE_NOTIFY</strong>
-                      <p>tradeStatus=TRADE_SUCCESS · amount=199.00</p>
-                    </article>
-                    <article class="source-ticket" data-ticket="hr">
-                      <span class="ticket-type">HR</span>
-                      <strong>EMPLOYEE_ORG_DELTA</strong>
-                      <p>employeeNo=E10384 · org=OPS-CN</p>
-                    </article>
-                  </div>
-                </div>
-
-                <div class="canvas-column pipeline-lane" data-scene-panel="pipeline">
-                  <div class="canvas-head">
-                    <span>Kafka + Rule Engine</span>
-                    <strong>Streaming Backbone</strong>
-                  </div>
-                  <div class="pipeline-flow">
-                    <div class="pipeline-node source-node" data-node="raw">
-                      <small>Kafka Raw Topic</small>
-                      <strong id="raw-topic-label">etl.raw.masterdata</strong>
-                    </div>
-                    <div class="pipeline-link">
-                      <span class="pipeline-pulse"></span>
-                    </div>
-                    <div class="pipeline-node rules-node" data-node="rules">
-                      <small>Rule Set</small>
-                      <strong id="rule-label">supplier-status-v3</strong>
-                    </div>
-                    <div class="pipeline-link">
-                      <span class="pipeline-pulse"></span>
-                    </div>
-                    <div class="pipeline-node engine-node" data-node="engine">
-                      <small>Transform Engine</small>
-                      <strong id="engine-label">Normalize + Validate</strong>
-                    </div>
-                    <div class="pipeline-link">
-                      <span class="pipeline-pulse"></span>
-                    </div>
-                    <div class="pipeline-node target-node" data-node="target">
-                      <small>Layered Output</small>
-                      <strong id="target-label">DWD Supplier</strong>
-                    </div>
-                  </div>
-
-                  <div class="rule-editor">
-                    <div class="rule-editor-head">
-                      <span>Rule Preview</span>
-                      <strong id="rule-editor-title">供应商状态映射规则</strong>
-                    </div>
-                    <div class="rule-lines" id="rule-lines">
-                      <span>A -> ACTIVE</span>
-                      <span>B -> INACTIVE</span>
-                      <span>Y -> ACTIVE</span>
-                      <span>N -> INACTIVE</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div class="canvas-column monitor-lane" data-scene-panel="monitor">
-                  <div class="canvas-head">
-                    <span>Live Monitor</span>
-                    <strong>Operator View</strong>
-                  </div>
-                  <div class="monitor-cards">
-                    <article class="monitor-card active" id="ops-card-throughput">
-                      <span>吞吐</span>
-                      <strong id="monitor-throughput">18,420 / min</strong>
-                    </article>
-                    <article class="monitor-card" id="ops-card-dirty">
-                      <span>脏数据率</span>
-                      <strong id="monitor-dirty">0.7%</strong>
-                    </article>
-                    <article class="monitor-card" id="ops-card-version">
-                      <span>规则版本</span>
-                      <strong id="monitor-version">v2026.04.09</strong>
-                    </article>
-                  </div>
-
-                  <div class="audit-feed" id="audit-feed">
-                    <article class="audit-row">
-                      <span>16:48:12</span>
-                      <strong>ERP supplier normalized</strong>
-                      <p>status: A -> ACTIVE</p>
-                    </article>
-                    <article class="audit-row">
-                      <span>16:48:18</span>
-                      <strong>Payment settled</strong>
-                      <p>199.00 yuan -> 19900 fen</p>
-                    </article>
-                    <article class="audit-row">
-                      <span>16:48:26</span>
-                      <strong>HR org validated</strong>
-                      <p>employee E10384 routed to DIM employee</p>
-                    </article>
-                  </div>
-                </div>
-              </div>
-
-              <div class="dataset-strip">
-                <article class="dataset-card active" data-table="erp">
-                  <div class="dataset-head">
-                    <span>ODS Raw</span>
-                    <strong>ERP Supplier Event</strong>
-                  </div>
-                  <div class="dataset-table">
-                    <div class="dataset-row">
-                      <span>supplier_code</span>
-                      <strong>KD_SUP_001</strong>
-                    </div>
-                    <div class="dataset-row">
-                      <span>source_status</span>
-                      <strong>A</strong>
-                    </div>
-                    <div class="dataset-row">
-                      <span>normalized_status</span>
-                      <strong>ACTIVE</strong>
-                    </div>
-                  </div>
-                </article>
-
-                <article class="dataset-card" data-table="payment">
-                  <div class="dataset-head">
-                    <span>FACT Payment</span>
-                    <strong>Trade Event</strong>
-                  </div>
-                  <div class="dataset-table">
-                    <div class="dataset-row">
-                      <span>trade_no</span>
-                      <strong>ALI202604090001</strong>
-                    </div>
-                    <div class="dataset-row">
-                      <span>amount_fen</span>
-                      <strong>19900</strong>
-                    </div>
-                    <div class="dataset-row">
-                      <span>pay_status</span>
-                      <strong>SUCCESS</strong>
-                    </div>
-                  </div>
-                </article>
-
-                <article class="dataset-card" data-table="hr">
-                  <div class="dataset-head">
-                    <span>DIM Employee</span>
-                    <strong>Employee Snapshot</strong>
-                  </div>
-                  <div class="dataset-table">
-                    <div class="dataset-row">
-                      <span>employee_no</span>
-                      <strong>E10384</strong>
-                    </div>
-                    <div class="dataset-row">
-                      <span>employment_status</span>
-                      <strong>ACTIVE</strong>
-                    </div>
-                    <div class="dataset-row">
-                      <span>department_code</span>
-                      <strong>OPS-CN</strong>
-                    </div>
-                  </div>
-                </article>
-              </div>
-            </section>
+          <div class="orbit-signal-cluster" aria-hidden="true">
+            <span class="orbit-signal kafka">Kafka Backbone</span>
+            <span class="orbit-signal mysql">MySQL Rules</span>
+            <span class="orbit-signal redis">Redis Cache</span>
           </div>
         </section>
-      </section>
+      </header>
 
-      <section class="capabilities-section" id="capabilities">
-        <div class="section-copy">
-          <p class="section-kicker">Platform Highlights</p>
-          <h2>它不只是接数据，而是把规则、治理、回放和分层结果一起平台化</h2>
-        </div>
+      <main>
+        <section class="demo-stage-section" id="demo-stage">
+          <div class="section-copy">
+            <p class="section-kicker">System Walkthrough</p>
+            <h2>接下来会自动讲解系统如何接入、处理和治理数据</h2>
+            <div
+              class="section-copy-body pretext-prose"
+              data-pretext-source="walkthrough-pretext-source"
+            >
+              下面这块舞台会自动播放一段本系统核心功能完整演示。它会依次展示虚拟的
+              ERP 供应商、支付流水、人员信息是如何进入 Kafka，
+              如何匹配规则、如何执行标准化、如何落到分层表，以及如何被审计和回放。
+            </div>
+          </div>
 
-        <div class="capability-grid">
-          <article class="capability-card">
-            <span>接入</span>
-            <h3>统一事件封套</h3>
-            <p>ERP、支付、人员、银行与第三方 SaaS 统一进入 Kafka，不再一套来源一套逻辑。</p>
-          </article>
-          <article class="capability-card">
-            <span>规则</span>
-            <h3>用户可配置转换规则</h3>
-            <p>字段提取、状态映射、金额单位、时间格式和校验条件都可以按版本维护。</p>
-          </article>
-          <article class="capability-card">
-            <span>处理</span>
-            <h3>自动分层落库</h3>
-            <p>原始层保真，标准层统一，业务层可读，兼顾业务查询与追溯审计。</p>
-          </article>
-          <article class="capability-card">
-            <span>治理</span>
-            <h3>DLQ / Replay / Audit</h3>
-            <p>坏数据隔离、手工修复、规则回放、版本审计和血缘追踪形成闭环。</p>
-          </article>
-        </div>
-      </section>
-    </main>
-  </div>
-</body>
+          <section class="demo-stage" aria-label="System demo stage">
+            <div class="demo-topbar">
+              <div class="demo-brand">
+                <span class="brand-mark">RD</span>
+                <div>
+                  <p class="brand-kicker">Rule-Driven ETL</p>
+                  <strong>Platform Console</strong>
+                </div>
+              </div>
+
+              <div class="demo-controls">
+                <button
+                  class="demo-toggle"
+                  type="button"
+                  data-autoplay-toggle
+                  aria-pressed="true"
+                >
+                  自动播放中
+                </button>
+                <div class="demo-progress">
+                  <span class="demo-progress-bar" data-scene-progress></span>
+                </div>
+              </div>
+            </div>
+
+            <div class="demo-grid">
+              <aside class="console-sidebar">
+                <div class="sidebar-block">
+                  <p class="sidebar-title">系统总览</p>
+                  <button
+                    class="sidebar-item"
+                    type="button"
+                    data-nav="architecture"
+                  >
+                    <span class="sidebar-dot arch"></span>
+                    全局数据架构
+                  </button>
+                </div>
+
+                <div class="sidebar-block">
+                  <p class="sidebar-title">基础设施</p>
+                  <button class="sidebar-item" type="button" data-nav="infra">
+                    <span class="sidebar-dot infra"></span>
+                    数据源及中间件
+                  </button>
+                </div>
+
+                <div class="sidebar-block">
+                  <p class="sidebar-title">数据域</p>
+                  <button
+                    class="sidebar-item is-current"
+                    type="button"
+                    data-scene-button="erp"
+                    data-nav="pipeline"
+                  >
+                    <span class="sidebar-dot erp"></span>
+                    ERP 主数据
+                  </button>
+                  <button
+                    class="sidebar-item"
+                    type="button"
+                    data-scene-button="payment"
+                    data-nav="pipeline"
+                  >
+                    <span class="sidebar-dot payment"></span>
+                    支付流水
+                  </button>
+                  <button
+                    class="sidebar-item"
+                    type="button"
+                    data-scene-button="hr"
+                    data-nav="pipeline"
+                  >
+                    <span class="sidebar-dot hr"></span>
+                    人员组织
+                  </button>
+                  <button
+                    class="sidebar-item"
+                    type="button"
+                    data-scene-button="documents"
+                    data-nav="pipeline"
+                  >
+                    <span class="sidebar-dot doc"></span>
+                    非结构化文档
+                  </button>
+                  <button
+                    class="sidebar-item"
+                    type="button"
+                    data-scene-button="governance"
+                    data-nav="pipeline"
+                  >
+                    <span class="sidebar-dot ops"></span>
+                    治理回放
+                  </button>
+                </div>
+
+                <div class="sidebar-block">
+                  <p class="sidebar-title">实时指标</p>
+                  <div class="metric-strip">
+                    <span>成功率</span>
+                    <strong id="metric-success-rate">99.3%</strong>
+                  </div>
+                  <div class="metric-strip">
+                    <span>DLQ</span>
+                    <strong id="metric-dlq">12</strong>
+                  </div>
+                  <div class="metric-strip">
+                    <span>Replay</span>
+                    <strong id="metric-replay">4</strong>
+                  </div>
+                </div>
+              </aside>
+
+              <section class="console-main">
+                <!-- 视图 1：管线动态演示 -->
+                <div id="view-pipeline" class="console-view active">
+                  <div class="story-banner">
+                    <div>
+                      <p class="story-kicker">Animated Narrative</p>
+                      <h3 id="scene-title">ERP 供应商数据接入</h3>
+                    </div>
+                    <p class="story-text" id="scene-text">
+                      金蝶和用友的供应商主数据先进入统一事件封套，系统随后按规则版本统一状态、时间和税号口径。
+                    </p>
+                  </div>
+
+                  <div class="presentation-canvas">
+                    <div
+                      class="canvas-column source-lane"
+                      data-scene-panel="erp"
+                    >
+                      <div class="canvas-head">
+                        <span>Source Connectors</span>
+                        <strong id="source-label">ERP Master Data</strong>
+                      </div>
+                      <div class="source-stack">
+                        <article
+                          class="source-ticket is-live"
+                          data-ticket="erp"
+                        >
+                          <span class="ticket-type">ERP</span>
+                          <strong>KINGDEE_SUPPLIER_SYNC</strong>
+                          <p>supplierCode=KD_SUP_001 · status=A</p>
+                        </article>
+                        <article class="source-ticket" data-ticket="payment">
+                          <span class="ticket-type">PAY</span>
+                          <strong>ALIPAY_TRADE_NOTIFY</strong>
+                          <p>tradeStatus=TRADE_SUCCESS · amount=199.00</p>
+                        </article>
+                        <article class="source-ticket" data-ticket="hr">
+                          <span class="ticket-type">HR</span>
+                          <strong>EMPLOYEE_ORG_DELTA</strong>
+                          <p>employeeNo=E10384 · org=OPS-CN</p>
+                        </article>
+                      </div>
+                    </div>
+
+                    <div
+                      class="canvas-column pipeline-lane"
+                      data-scene-panel="pipeline"
+                    >
+                      <div class="canvas-head">
+                        <span>Kafka + Rule Engine</span>
+                        <strong>Streaming Backbone</strong>
+                      </div>
+                      <div class="pipeline-flow">
+                        <div class="pipeline-node source-node" data-node="raw">
+                          <small>Kafka Raw Topic</small>
+                          <strong id="raw-topic-label"
+                            >etl.raw.masterdata</strong
+                          >
+                        </div>
+                        <div class="pipeline-link">
+                          <span class="pipeline-pulse"></span>
+                        </div>
+                        <div class="pipeline-node rules-node" data-node="rules">
+                          <small>Rule Set</small>
+                          <strong id="rule-label">supplier-status-v3</strong>
+                        </div>
+                        <div class="pipeline-link">
+                          <span class="pipeline-pulse"></span>
+                        </div>
+                        <div
+                          class="pipeline-node engine-node"
+                          data-node="engine"
+                        >
+                          <small>Transform Engine</small>
+                          <strong id="engine-label"
+                            >Normalize + Validate</strong
+                          >
+                        </div>
+                        <div class="pipeline-link">
+                          <span class="pipeline-pulse"></span>
+                        </div>
+                        <div
+                          class="pipeline-node target-node"
+                          data-node="target"
+                        >
+                          <small>Layered Output</small>
+                          <strong id="target-label">DWD Supplier</strong>
+                        </div>
+                      </div>
+
+                      <div class="rule-editor">
+                        <div class="rule-editor-head">
+                          <span>Rule Preview</span>
+                          <strong id="rule-editor-title"
+                            >供应商状态映射规则</strong
+                          >
+                        </div>
+                        <div class="rule-lines" id="rule-lines">
+                          <span>A -> ACTIVE</span>
+                          <span>B -> INACTIVE</span>
+                          <span>Y -> ACTIVE</span>
+                          <span>N -> INACTIVE</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div
+                      class="canvas-column monitor-lane"
+                      data-scene-panel="monitor"
+                    >
+                      <div class="canvas-head">
+                        <span>Live Monitor</span>
+                        <strong>Operator View</strong>
+                      </div>
+                      <div class="monitor-cards">
+                        <article
+                          class="monitor-card active"
+                          id="ops-card-throughput"
+                        >
+                          <span>吞吐</span>
+                          <strong id="monitor-throughput">18,420 / min</strong>
+                        </article>
+                        <article class="monitor-card" id="ops-card-dirty">
+                          <span>脏数据率</span>
+                          <strong id="monitor-dirty">0.7%</strong>
+                        </article>
+                        <article class="monitor-card" id="ops-card-version">
+                          <span>规则版本</span>
+                          <strong id="monitor-version">v2026.04.09</strong>
+                        </article>
+                      </div>
+
+                      <div class="audit-feed" id="audit-feed">
+                        <article class="audit-row">
+                          <span>16:48:12</span>
+                          <strong>ERP supplier normalized</strong>
+                          <p>status: A -> ACTIVE</p>
+                        </article>
+                        <article class="audit-row">
+                          <span>16:48:18</span>
+                          <strong>Payment settled</strong>
+                          <p>199.00 yuan -> 19900 fen</p>
+                        </article>
+                        <article class="audit-row">
+                          <span>16:48:26</span>
+                          <strong>HR org validated</strong>
+                          <p>employee E10384 routed to DIM employee</p>
+                        </article>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="dataset-strip">
+                    <article class="dataset-card active" data-table="erp">
+                      <div class="dataset-head">
+                        <span>ODS Raw</span>
+                        <strong>ERP Supplier Event</strong>
+                      </div>
+                      <div class="dataset-table">
+                        <div class="dataset-row">
+                          <span>supplier_code</span>
+                          <strong>KD_SUP_001</strong>
+                        </div>
+                        <div class="dataset-row">
+                          <span>source_status</span>
+                          <strong>A</strong>
+                        </div>
+                        <div class="dataset-row">
+                          <span>normalized_status</span>
+                          <strong>ACTIVE</strong>
+                        </div>
+                      </div>
+                    </article>
+
+                    <article class="dataset-card" data-table="payment">
+                      <div class="dataset-head">
+                        <span>FACT Payment</span>
+                        <strong>Trade Event</strong>
+                      </div>
+                      <div class="dataset-table">
+                        <div class="dataset-row">
+                          <span>trade_no</span>
+                          <strong>ALI202604090001</strong>
+                        </div>
+                        <div class="dataset-row">
+                          <span>amount_fen</span>
+                          <strong>19900</strong>
+                        </div>
+                        <div class="dataset-row">
+                          <span>pay_status</span>
+                          <strong>SUCCESS</strong>
+                        </div>
+                      </div>
+                    </article>
+
+                    <article class="dataset-card" data-table="hr">
+                      <div class="dataset-head">
+                        <span>DIM Employee</span>
+                        <strong>Employee Snapshot</strong>
+                      </div>
+                      <div class="dataset-table">
+                        <div class="dataset-row">
+                          <span>employee_no</span>
+                          <strong>E10384</strong>
+                        </div>
+                        <div class="dataset-row">
+                          <span>employment_status</span>
+                          <strong>ACTIVE</strong>
+                        </div>
+                        <div class="dataset-row">
+                          <span>department_code</span>
+                          <strong>OPS-CN</strong>
+                        </div>
+                      </div>
+                    </article>
+
+                    <article class="dataset-card" data-table="documents">
+                      <div class="dataset-head">
+                        <span>Vector KB</span>
+                        <strong>AI Knowledge Chunks</strong>
+                      </div>
+                      <div class="dataset-table">
+                        <div class="dataset-row">
+                          <span>source_file</span>
+                          <strong>Q2_Report.pdf</strong>
+                        </div>
+                        <div class="dataset-row">
+                          <span>chunk_id</span>
+                          <strong>CHUNK-428A1</strong>
+                        </div>
+                        <div class="dataset-row">
+                          <span>trace_status</span>
+                          <strong>INDEXED & TRACEABLE</strong>
+                        </div>
+                      </div>
+                    </article>
+                  </div>
+                </div>
+                <!-- #view-pipeline -->
+
+                <!-- 视图 2：数据源配置与查看界面 -->
+                <div id="view-infra" class="console-view">
+                  <div class="infra-layout">
+                    <div class="infra-list">
+                      <div class="infra-list-head">可用数据源</div>
+
+                      <button
+                        class="infra-list-item active"
+                        data-infra-target="kafka"
+                      >
+                        <div class="infra-icon small kafka-icon">
+                          <svg
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.5"
+                          >
+                            <circle cx="12" cy="6" r="2.5" />
+                            <circle cx="6" cy="15" r="2.5" />
+                            <circle cx="18" cy="15" r="2.5" />
+                            <line x1="12" y1="8.5" x2="7.5" y2="13" />
+                            <line x1="12" y1="8.5" x2="16.5" y2="13" />
+                            <line x1="8.5" y1="15" x2="15.5" y2="15" />
+                          </svg>
+                        </div>
+                        <div class="infra-list-info">
+                          <strong>Kafka 数据总线</strong>
+                          <span>3 brokers · 在线</span>
+                        </div>
+                      </button>
+
+                      <button class="infra-list-item" data-infra-target="mysql">
+                        <div class="infra-icon small mysql-icon">
+                          <svg
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.5"
+                          >
+                            <ellipse cx="12" cy="6" rx="8" ry="3" />
+                            <path d="M4 6v4c0 1.66 3.58 3 8 3s8-1.34 8-3V6" />
+                            <path d="M4 10v4c0 1.66 3.58 3 8 3s8-1.34 8-3v-4" />
+                            <path d="M4 14v4c0 1.66 3.58 3 8 3s8-1.34 8-3v-4" />
+                          </svg>
+                        </div>
+                        <div class="infra-list-info">
+                          <strong>MySQL 业务库</strong>
+                          <span>Master-Slave · 在线</span>
+                        </div>
+                      </button>
+
+                      <button class="infra-list-item" data-infra-target="redis">
+                        <div class="infra-icon small redis-icon">
+                          <svg
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.5"
+                          >
+                            <path d="M12 3L2 8l10 5 10-5-10-5z" />
+                            <path d="M2 12l10 5 10-5" />
+                            <path d="M2 16l10 5 10-5" />
+                          </svg>
+                        </div>
+                        <div class="infra-list-info">
+                          <strong>Redis 缓存与规则</strong>
+                          <span>Cluster 6 nodes · 在线</span>
+                        </div>
+                      </button>
+
+                      <button
+                        class="infra-list-item"
+                        data-infra-target="excel"
+                      >
+                        <div class="infra-icon small mongo-icon">
+                          <svg
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.5"
+                          >
+                            <path
+                              d="M12 2C9 2 7 5 7 9c0 3 1.5 6 3.5 8.5.7.9 1.2 2.5 1.5 4.5h0c.3-2 .8-3.6 1.5-4.5C15.5 15 17 12 17 9c0-4-2-7-5-7z"
+                            />
+                            <line x1="12" y1="22" x2="12" y2="14" />
+                          </svg>
+                        </div>
+                        <div class="infra-list-info">
+                          <strong>Excel 文件接入</strong>
+                          <span>XLSX 解析 · 本地/上传</span>
+                        </div>
+                      </button>
+                    </div>
+
+                    <div class="infra-detail-panel">
+                      <div class="panel-header">
+                        <div>
+                          <h3 id="infra-panel-title">Kafka 数据总线</h3>
+                          <p id="infra-panel-desc">
+                            负责接收各个业务系统的原始数据，并分发给规则引擎处理。
+                          </p>
+                        </div>
+                        <div class="panel-actions">
+                          <button class="btn-secondary" type="button" id="infra-fill-local">填充本地示例</button>
+                          <button class="btn-primary" type="button" id="infra-run-test">测试连接</button>
+                        </div>
+                      </div>
+
+                      <div class="panel-body">
+                        <div class="info-grid">
+                          <div class="info-item">
+                            <label>服务地址</label>
+                            <span id="infra-prop-address"
+                              >kafka-broker-01:9092, kafka-broker-02:9092</span
+                            >
+                          </div>
+                          <div class="info-item">
+                            <label>版本</label>
+                            <span id="infra-prop-version">v3.5.0</span>
+                          </div>
+                          <div class="info-item">
+                            <label>关键资源 (Topics等)</label>
+                            <span id="infra-prop-topics"
+                              >etl.raw.erp, etl.raw.payment, etl.raw.hr</span
+                            >
+                          </div>
+                          <div class="info-item">
+                            <label>延迟/TPS</label>
+                            <span id="infra-prop-health"
+                              >延迟 12ms / TPS 30k</span
+                            >
+                          </div>
+                        </div>
+
+                        <section class="connection-config-card">
+                          <div class="config-card-head">
+                            <div>
+                              <h4>连接配置</h4>
+                              <p>支持本地地址或云端地址。点击“测试连接”会直接调用后端进行真实连通性校验。</p>
+                            </div>
+                            <span class="config-card-tip">不执行导入，只做连接测试</span>
+                          </div>
+                          <div id="infra-form-fields" class="connection-form-grid"></div>
+                          <div id="infra-test-result" class="connection-test-result is-idle">
+                            <strong>等待测试</strong>
+                            <p>填写参数后可测试 Kafka / MySQL / Redis / Excel 连接。</p>
+                          </div>
+                        </section>
+
+                        <div class="panel-logs">
+                          <div class="log-header">
+                            <h4>最近操作与运行日志</h4>
+                            <span
+                              >实时刷新 <span class="pulse-dot"></span
+                            ></span>
+                          </div>
+                          <div class="terminal-view" id="infra-terminal-logs">
+                            <div>
+                              <span class="log-time">[16:40:12]</span>
+                              <span class="log-level info">INFO</span> Heartbeat
+                              check success. 3 brokers alive.
+                            </div>
+                            <div>
+                              <span class="log-time">[16:42:01]</span>
+                              <span class="log-level info">INFO</span> Received
+                              1402 messages from topic [etl.raw.erp].
+                            </div>
+                            <div>
+                              <span class="log-time">[16:45:33]</span>
+                              <span class="log-level warn">WARN</span> Consumer
+                              group [rule-engine-cg] lag increasing (current:
+                              450).
+                            </div>
+                            <div>
+                              <span class="log-time">[16:45:35]</span>
+                              <span class="log-level info">INFO</span>
+                              Auto-scaling worker nodes. Lag resolving.
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <!-- #view-infra -->
+                <!-- 视图 3：全链路思维架构和分发网关 -->
+                <div id="view-architecture" class="console-view">
+                  <div class="story-banner">
+                    <div>
+                      <p class="story-kicker">
+                        Global Architecture & Data Distributing
+                      </p>
+                      <h3 id="arch-title">构建唯一真实的业务数据源中心</h3>
+                    </div>
+                    <p class="story-text">
+                      所有多态、无序的外部信号，都在此清洗收敛为唯一的、高可信的数据源（Single
+                      Source of Truth）。同时对下游其他系统开放标准化的 Open API
+                      与集成 SDK，赋能核心业务。
+                    </p>
+                  </div>
+
+                  <div class="global-arch-canvas">
+                    <!-- 新增：全流程演示按钮 -->
+                    <div class="arch-top-actions">
+                      <button
+                        class="btn-play-all"
+                        type="button"
+                        id="btn-play-full-flow"
+                      >
+                        <span class="play-icon">▶</span>
+                        演示全流程数据流转与清洗
+                      </button>
+                    </div>
+
+                    <!-- 层级一：数据输入层 -->
+                    <div class="arch-stage arch-source">
+                      <div class="stage-label">01 / 多源数据捕获层</div>
+                      <div class="arch-boxes">
+                        <div
+                          class="arch-box clickable"
+                          data-source-detail="erp"
+                        >
+                          <span class="box-badge">ERP</span>
+                          <strong>主数据源</strong>
+                          <p>金蝶/用友/SAP</p>
+                          <div class="box-action-hint">查看示例 &gt;</div>
+                        </div>
+                        <div
+                          class="arch-box clickable"
+                          data-source-detail="fin"
+                        >
+                          <span class="box-badge">FIN</span>
+                          <strong>支付流水</strong>
+                          <p>支付宝/微信/银行对账</p>
+                          <div class="box-action-hint">查看示例 &gt;</div>
+                        </div>
+                        <div class="arch-box clickable" data-source-detail="hr">
+                          <span class="box-badge">HR / OA</span>
+                          <strong>人员组织</strong>
+                          <p>飞书/钉钉/企微</p>
+                          <div class="box-action-hint">查看示例 &gt;</div>
+                        </div>
+                        <div
+                          class="arch-box clickable"
+                          data-source-detail="docs"
+                        >
+                          <span class="box-badge">DOCS</span>
+                          <strong>非结构化文档</strong>
+                          <p>Excel / Word / PDF</p>
+                          <div class="box-action-hint">查看示例 &gt;</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- 连线动态管道 -->
+                    <div class="arch-pipe-group">
+                      <div class="arch-pipe animated-flow down"></div>
+                      <div class="arch-pipe animated-flow down"></div>
+                      <div class="arch-pipe animated-flow down"></div>
+                      <div class="arch-pipe animated-flow down"></div>
+                    </div>
+
+                    <!-- 层级二：数据中枢与真实汇聚点 (Data Center / TRUTH) -->
+                    <div class="arch-stage arch-hub">
+                      <div class="stage-label">02 / 数据规范汇聚中枢</div>
+
+                      <div class="hub-container">
+                        <div class="hub-engine">
+                          <div class="engine-core">
+                            <span class="hub-icon">♻</span>
+                            <div>
+                              <strong>Rule-Driven Pipeline</strong>
+                              <p>规则引擎 (Flink/KStream)</p>
+                            </div>
+                          </div>
+                          <ul class="engine-capabilities">
+                            <li>✦ 字段动态映射</li>
+                            <li>✦ 状态口径统一</li>
+                            <li>✦ 异常稽核回放</li>
+                          </ul>
+                        </div>
+
+                        <div
+                          class="arch-pipe animated-flow right horizontal"
+                        ></div>
+
+                        <!-- Single Source of Truth Core -->
+                        <div class="hub-ssot glow-pulse">
+                          <div class="ssot-header">
+                            <span class="ssot-badge">Data Center</span>
+                            <strong>唯一真实数据源</strong>
+                            <p>Single Source of Truth</p>
+                          </div>
+                          <div class="ssot-layers">
+                            <div class="ssot-layer">
+                              <span>ODS</span>原始宽表
+                            </div>
+                            <div class="ssot-layer active">
+                              <span>DWD</span>标准化明细
+                            </div>
+                            <div class="ssot-layer">
+                              <span>DWS</span>汇总服务模型
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div
+                      class="arch-pipe animated-flow down text-center center-pipe"
+                    ></div>
+
+                    <!-- 层级三：API / SDK 分发 -->
+                    <div class="arch-stage arch-delivery">
+                      <div class="stage-label">03 / 向外赋能服务分发</div>
+                      <div class="delivery-container">
+                        <div class="delivery-endpoint">
+                          <strong>Open API Gateway</strong>
+                          <p>RESTful / GraphQL / Webhook</p>
+                          <div class="code-snippet group">
+                            <code
+                              >GET /api/v1/suppliers/{id}<br />Authorization:
+                              Bearer &lt;Token&gt;</code
+                            >
+                          </div>
+                        </div>
+                        <div class="delivery-endpoint">
+                          <strong>Client SDK</strong>
+                          <p>Java / Python / Node.js Clients</p>
+                          <div class="code-snippet group">
+                            <code
+                              >PlatformClient client = new Client(key);<br />client.getSupplier(req);</code
+                            >
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="arch-pipe animated-flow down split-paths"></div>
+
+                    <!-- 层级四：下游核心业务 -->
+                    <div class="arch-stage arch-consumers">
+                      <div class="stage-label">04 / 核心业务消费</div>
+                      <div class="consumer-boxes">
+                        <div class="arch-box consumer glow-ai">
+                          智能推荐系统 (AI/RAG)
+                        </div>
+                        <div class="arch-box consumer">审计与对账中心</div>
+                        <div class="arch-box consumer">企业 BI 报表</div>
+                        <div class="arch-box consumer">风控模型计算</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <!-- #view-architecture -->
+
+                <!-- 覆盖：数据源详情抽屉 (Modal/Drawer) -->
+                <div id="source-detail-drawer" class="drawer-overlay hidden">
+                  <div class="drawer-content">
+                    <div class="drawer-header">
+                      <div>
+                        <span class="drawer-badge" id="drawer-badge">ERP</span>
+                        <h3 id="drawer-title">金蝶/用友主数据接入</h3>
+                      </div>
+                      <button class="btn-close-drawer" id="btn-close-drawer">
+                        ×
+                      </button>
+                    </div>
+                    <div class="drawer-body">
+                      <div class="drawer-section">
+                        <h4>接入与处理文档说明</h4>
+                        <p id="drawer-doc">这里是一段长文档</p>
+                      </div>
+                      <div class="drawer-section">
+                        <h4>输入数据示例 (Raw Event Payload)</h4>
+                        <pre
+                          id="drawer-code"
+                          class="code-snippet-block"
+                        ><code>{ ... }</code></pre>
+                      </div>
+                    </div>
+                    <div class="drawer-footer">
+                      <button class="btn-primary" id="btn-jump-to-pipeline">
+                        跳转演示处理链路 →
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            </div>
+          </section>
+        </section>
+
+        <section class="capabilities-section" id="capabilities">
+          <div class="section-copy">
+            <p class="section-kicker">Platform Highlights</p>
+            <h2>它不只是接数据，而是把规则、治理、回放和分层结果一起平台化</h2>
+          </div>
+
+          <div class="capability-grid">
+            <article class="capability-card">
+              <span>接入</span>
+              <h3>统一事件封套</h3>
+              <p>
+                ERP、支付、人员、银行与第三方 SaaS 统一进入
+                Kafka，不再一套来源一套逻辑。
+              </p>
+            </article>
+            <article class="capability-card">
+              <span>规则</span>
+              <h3>用户可配置转换规则</h3>
+              <p>
+                字段提取、状态映射、金额单位、时间格式和校验条件都可以按版本维护。
+              </p>
+            </article>
+            <article class="capability-card">
+              <span>处理</span>
+              <h3>自动分层落库</h3>
+              <p>
+                原始层保真，标准层统一，业务层可读，兼顾业务查询与追溯审计。
+              </p>
+            </article>
+            <article class="capability-card">
+              <span>治理</span>
+              <h3>DLQ / Replay / Audit</h3>
+              <p>
+                坏数据隔离、手工修复、规则回放、版本审计和血缘追踪形成闭环。
+              </p>
+            </article>
+            <article class="capability-card">
+              <span>本地AI</span>
+              <h3>本地化部署与实时研究</h3>
+              <p>
+                支持本地部署项目与本地 AI
+                引擎，实时分析你的全量数据，沉淀可追溯知识，帮助你更快调用与编排工具。
+              </p>
+            </article>
+          </div>
+        </section>
+      </main>
+
+      <script type="text/plain" id="hero-pretext-source">
+        数据源先进入 Kafka，平台根据规则版本自动执行字段提取、状态映射、金额标准化、数据校验、落库分层与异常回放。
+
+        这不是一堆脚本，而是一套可配置、可追溯、可演示的数据平台。
+
+        *可溯源* 节点可以挂接 ERP、支付、HR、文档与日志等多种数据源。
+      </script>
+
+      <script type="text/plain" id="walkthrough-pretext-source">
+        下面这块舞台会自动播放一段本系统核心功能完整演示。
+
+        它会依次展示以下链路：
+
+        - ERP 供应商、支付流水、人员信息如何进入 Kafka
+        - 如何匹配规则并执行标准化
+        - 如何落到分层表并形成审计回放
+      </script>
+    </div>
+  </body>
 </html>

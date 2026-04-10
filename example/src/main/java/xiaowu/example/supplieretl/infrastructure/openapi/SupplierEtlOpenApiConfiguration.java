@@ -15,7 +15,7 @@ public class SupplierEtlOpenApiConfiguration {
   GroupedOpenApi supplierEtlGroupedOpenApi() {
     return GroupedOpenApi.builder()
         .group("supplier-etl")
-        .pathsToMatch("/api/examples/suppliers/**")
+        .pathsToMatch("/api/examples/suppliers/**", "/api/examples/data-sources/**")
         .build();
   }
 

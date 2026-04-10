@@ -167,3 +167,66 @@ CREATE INDEX idx_supplier_normalized_record_supplier
 
 CREATE INDEX idx_supplier_normalized_record_business_code
     ON supplier_normalized_record (supplier_id, source_business_code);
+
+CREATE TABLE etl_data_source_connection (
+    id                 BIGINT        AUTO_INCREMENT PRIMARY KEY,
+    connection_name    VARCHAR(64)   NOT NULL,
+    data_source_type   VARCHAR(32)   NOT NULL,
+    description        VARCHAR(255),
+    config_json        CLOB          NOT NULL,
+    created_at         TIMESTAMP     NOT NULL,
+    updated_at         TIMESTAMP     NOT NULL
+);
+
+CREATE UNIQUE INDEX uk_etl_data_source_connection_name
+    ON etl_data_source_connection (connection_name);
+
+CREATE INDEX idx_etl_data_source_connection_type
+    ON etl_data_source_connection (data_source_type);
+
+CREATE TABLE etl_connection_test_log (
+    id                 BIGINT        AUTO_INCREMENT PRIMARY KEY,
+    connection_id      BIGINT        NOT NULL,
+    data_source_type   VARCHAR(32)   NOT NULL,
+    success            BOOLEAN       NOT NULL,
+    message            VARCHAR(512)  NOT NULL,
+    detail_json        CLOB,
+    tested_at          TIMESTAMP     NOT NULL
+);
+
+CREATE INDEX idx_etl_connection_test_log_connection
+    ON etl_connection_test_log (connection_id, tested_at DESC);
+
+CREATE TABLE etl_ingestion_job (
+    id                 BIGINT        AUTO_INCREMENT PRIMARY KEY,
+    connection_id      BIGINT        NOT NULL,
+    data_source_type   VARCHAR(32)   NOT NULL,
+    status             VARCHAR(32)   NOT NULL,
+    message            VARCHAR(512),
+    request_json       CLOB,
+    result_json        CLOB,
+    started_at         TIMESTAMP     NOT NULL,
+    finished_at        TIMESTAMP
+);
+
+CREATE INDEX idx_etl_ingestion_job_connection
+    ON etl_ingestion_job (connection_id, started_at DESC);
+
+CREATE TABLE etl_connection_security_audit (
+    id                 BIGINT        AUTO_INCREMENT PRIMARY KEY,
+    action             VARCHAR(32)   NOT NULL,
+    connection_id      BIGINT,
+    data_source_type   VARCHAR(32)   NOT NULL,
+    actor_id           VARCHAR(128),
+    client_ip          VARCHAR(64)   NOT NULL,
+    target_summary     VARCHAR(512),
+    resolved_addresses VARCHAR(512),
+    success            BOOLEAN       NOT NULL,
+    status             VARCHAR(32)   NOT NULL,
+    message            VARCHAR(512)  NOT NULL,
+    detail_json        CLOB,
+    created_at         TIMESTAMP     NOT NULL
+);
+
+CREATE INDEX idx_etl_connection_security_audit_created
+    ON etl_connection_security_audit (created_at DESC);

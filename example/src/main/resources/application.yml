@@ -102,6 +102,19 @@ supplier:
       read-timeout-ms: 15000
       page-size: 100
       sandbox: true
+
+data-source:
+  security:
+    allowlist:
+      public-only: true
+      exact-hosts: []
+      domain-suffixes: []
+      cidr-blocks: []
+    rate-limit:
+      window-seconds: 300
+      max-requests-per-client-ip: 20
+      max-requests-per-resolved-target: 10
+      max-requests-per-client-ip-target: 3
     yonyou:
       base-url: https://open.yonyoucloud.com
       app-id: "your_app_id"
